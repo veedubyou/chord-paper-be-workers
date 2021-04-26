@@ -2,6 +2,7 @@ package store
 
 import (
 	"chord-paper-be-workers/src/application/entity"
+	"chord-paper-be-workers/src/lib/werror"
 	"context"
 	"fmt"
 
@@ -20,7 +21,7 @@ func NewGoogleFileStorage(jsonKey string, bucketName string) (GoogleFileStorage,
 	googleStorageClient, err := storage.NewClient(context.Background(), option.WithCredentialsJSON([]byte(jsonKey)))
 
 	if err != nil {
-		return GoogleFileStorage{}, err // wrap
+		return GoogleFileStorage{}, werror.WrapError("Failed to create Google Cloud Storage client", err)
 	}
 
 	return GoogleFileStorage{
@@ -37,12 +38,12 @@ func (g GoogleFileStorage) WriteFile(ctx context.Context, filePath string, fileC
 		closeErr := writer.Close()
 		if err == nil && closeErr != nil {
 			fileURL = ""
-			err = closeErr
+			err = werror.WrapError("Error occurred when closing the upload stream", closeErr)
 		}
 	}()
 
 	if _, err = writer.Write(fileContent); err != nil {
-		return "", err
+		return "", werror.WrapError("Error occurred when uploading file", err)
 	}
 
 	return g.formatFileURL(objectHandle.ObjectName()), nil
