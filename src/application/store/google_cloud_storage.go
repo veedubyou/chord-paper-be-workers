@@ -5,12 +5,16 @@ import (
 	"chord-paper-be-workers/src/lib/werror"
 	"context"
 	"fmt"
+	"io"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 )
 
 var _ entity.FileStorage = GoogleFileStorage{}
+
+const GOOGLE_STORAGE_HOST = "https://storage.googleapis.com"
 
 type GoogleFileStorage struct {
 	storageClient *storage.Client
@@ -30,9 +34,30 @@ func NewGoogleFileStorage(jsonKey string, bucketName string) (GoogleFileStorage,
 	}, nil
 }
 
+func (g GoogleFileStorage) GetFile(ctx context.Context, fileURL string) ([]byte, error) {
+	filePath, err := g.filePathFromURL(fileURL)
+	if err != nil {
+		return nil, werror.WrapError("Couldn't extract file path from URL", err)
+	}
+
+	objectHandle := g.objectHandle(filePath)
+	reader, err := objectHandle.NewReader(ctx)
+	if err != nil {
+		return nil, werror.WrapError("Failed to create reader for Google object handle", err)
+	}
+
+	defer reader.Close()
+
+	contents, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, werror.WrapError("Failed to read remote file", err)
+	}
+
+	return contents, nil
+}
+
 func (g GoogleFileStorage) WriteFile(ctx context.Context, filePath string, fileContent []byte) (fileURL string, err error) {
-	bucketHandle := g.storageClient.Bucket(g.bucketName)
-	objectHandle := bucketHandle.Object(filePath)
+	objectHandle := g.objectHandle(filePath)
 	writer := objectHandle.NewWriter(ctx)
 	defer func() {
 		closeErr := writer.Close()
@@ -46,9 +71,27 @@ func (g GoogleFileStorage) WriteFile(ctx context.Context, filePath string, fileC
 		return "", werror.WrapError("Error occurred when uploading file", err)
 	}
 
-	return g.formatFileURL(objectHandle.ObjectName()), nil
+	return g.fileURL(objectHandle.ObjectName()), nil
 }
 
-func (g GoogleFileStorage) formatFileURL(filePath string) string {
-	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", g.bucketName, filePath)
+func (g GoogleFileStorage) filePathFromURL(fileURL string) (string, error) {
+	urlPrefix := g.bucketURL() + "/"
+
+	if !strings.HasPrefix(fileURL, urlPrefix) {
+		return "", werror.WrapError("File path given not in the Google cloud storage format", nil)
+	}
+
+	return strings.Replace(fileURL, urlPrefix, "", 1), nil
+}
+
+func (g GoogleFileStorage) objectHandle(filePath string) *storage.ObjectHandle {
+	return g.storageClient.Bucket(g.bucketName).Object(filePath)
+}
+
+func (g GoogleFileStorage) bucketURL() string {
+	return fmt.Sprintf("%s/%s", GOOGLE_STORAGE_HOST, g.bucketName)
+}
+
+func (g GoogleFileStorage) fileURL(filePath string) string {
+	return fmt.Sprintf("%s/%s", g.bucketURL(), filePath)
 }
