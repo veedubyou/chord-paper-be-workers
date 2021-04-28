@@ -3,6 +3,6 @@ package entity
 import "context"
 
 type FileStorage interface {
-	GetFile(ctx context.Context, filePath string) ([]byte, error)
-	WriteFile(ctx context.Context, filePath string, fileContent []byte) (string, error)
+	GetFile(ctx context.Context, url string) ([]byte, error)
+	WriteFile(ctx context.Context, url string, fileContent []byte) error
 }
