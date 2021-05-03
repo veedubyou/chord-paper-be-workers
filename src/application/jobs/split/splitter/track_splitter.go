@@ -1,7 +1,7 @@
 package splitter
 
 import (
-	store2 "chord-paper-be-workers/src/application/cloud_storage/store"
+	"chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/lib/werror"
 	"context"
 	"fmt"
@@ -40,5 +40,5 @@ func (s TrackSplitter) generatePath(songID string, trackID string, splitType Spl
 		return "", werror.WrapError("Invalid split type provided", nil)
 	}
 
-	return fmt.Sprintf("%s/%s/%s/%s/%s", store2.GOOGLE_STORAGE_HOST, s.bucketName, songID, trackID, splitDir), nil
+	return fmt.Sprintf("%s/%s/%s/%s/%s", store.GOOGLE_STORAGE_HOST, s.bucketName, songID, trackID, splitDir), nil
 }

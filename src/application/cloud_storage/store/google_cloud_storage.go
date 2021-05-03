@@ -1,7 +1,7 @@
 package store
 
 import (
-	entity2 "chord-paper-be-workers/src/application/cloud_storage/entity"
+	"chord-paper-be-workers/src/application/cloud_storage/entity"
 	"chord-paper-be-workers/src/lib/werror"
 	"context"
 	"io"
@@ -11,7 +11,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var _ entity2.FileStore = GoogleFileStore{}
+var _ entity.FileStore = GoogleFileStore{}
 
 const GOOGLE_STORAGE_HOST = "https://storage.googleapis.com"
 
