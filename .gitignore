@@ -12,3 +12,6 @@
 *.out
 cloudkey.json
 .idea/
+wd/
+.envrc
+.envrc

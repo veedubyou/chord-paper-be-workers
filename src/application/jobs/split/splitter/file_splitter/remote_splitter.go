@@ -1,8 +1,10 @@
-package split
+package file_splitter
 
 import (
-	"chord-paper-be-workers/src/application/entity"
+	cloudstorage "chord-paper-be-workers/src/application/cloud_storage/entity"
+	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -12,10 +14,10 @@ import (
 	"github.com/apex/log"
 )
 
-var _ FileSplitter = RemoteFileSplitter{}
+var _ splitter.FileSplitter = RemoteFileSplitter{}
 
-func NewRemoteFileSplitter(workingDirStr string, remoteFileStore entity.FileStorage, localSplitter LocalFileSplitter) (RemoteFileSplitter, error) {
-	workingDir, err := NewWorkingDir(workingDirStr)
+func NewRemoteFileSplitter(workingDirStr string, remoteFileStore cloudstorage.FileStore, localSplitter LocalFileSplitter) (RemoteFileSplitter, error) {
+	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
 		return RemoteFileSplitter{}, werror.WrapError("Failed to create working directory object", err)
 	}
@@ -28,12 +30,12 @@ func NewRemoteFileSplitter(workingDirStr string, remoteFileStore entity.FileStor
 }
 
 type RemoteFileSplitter struct {
-	workingDir      WorkingDir
-	remoteFileStore entity.FileStorage
+	workingDir      working_dir.WorkingDir
+	remoteFileStore cloudstorage.FileStore
 	localSplitter   LocalFileSplitter
 }
 
-func (r RemoteFileSplitter) SplitFile(ctx context.Context, remoteSourcePath string, remoteDestPath string, splitType Type) (StemFilePaths, error) {
+func (r RemoteFileSplitter) SplitFile(ctx context.Context, remoteSourcePath string, remoteDestPath string, splitType splitter.SplitType) (splitter.StemFilePaths, error) {
 	logger := log.WithFields(log.Fields{
 		"remoteSourcePath": remoteSourcePath,
 		"remoteDestPath":   remoteDestPath,
@@ -125,9 +127,9 @@ func (r RemoteFileSplitter) uploadStem(ctx context.Context, done chan error, sou
 	return
 }
 
-func (r RemoteFileSplitter) uploadStems(ctx context.Context, remoteStemDir string, localStemFilePaths StemFilePaths) (StemFilePaths, error) {
+func (r RemoteFileSplitter) uploadStems(ctx context.Context, remoteStemDir string, localStemFilePaths splitter.StemFilePaths) (splitter.StemFilePaths, error) {
 	uploadResultChannels := []chan error{}
-	remoteFilePaths := StemFilePaths{}
+	remoteFilePaths := splitter.StemFilePaths{}
 
 	log.Info("Spinning off upload threads")
 
