@@ -1,7 +1,8 @@
-package split
+package working_dir
 
 import (
 	"chord-paper-be-workers/src/lib/werror"
+	"os"
 	"path/filepath"
 )
 
@@ -14,6 +15,9 @@ func NewWorkingDir(root string) (WorkingDir, error) {
 	if err != nil {
 		return WorkingDir{}, werror.WrapError("Failed to generate absolute path for working directory", err)
 	}
+
+	_ = os.MkdirAll(absRoot, os.ModePerm)
+	_ = os.MkdirAll(filepath.Join(absRoot, "tmp"), os.ModePerm)
 
 	return WorkingDir{
 		root: absRoot,

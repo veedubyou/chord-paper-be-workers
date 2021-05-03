@@ -1,7 +1,7 @@
 package store
 
 import (
-	"chord-paper-be-workers/src/application/entity"
+	"chord-paper-be-workers/src/application/cloud_storage/entity"
 	"chord-paper-be-workers/src/lib/werror"
 	"context"
 	"io"
@@ -11,27 +11,27 @@ import (
 	"google.golang.org/api/option"
 )
 
-var _ entity.FileStorage = GoogleFileStorage{}
+var _ entity.FileStore = GoogleFileStore{}
 
 const GOOGLE_STORAGE_HOST = "https://storage.googleapis.com"
 
-type GoogleFileStorage struct {
+type GoogleFileStore struct {
 	storageClient *storage.Client
 }
 
-func NewGoogleFileStorage(jsonKey string) (GoogleFileStorage, error) {
+func NewGoogleFileStore(jsonKey string) (GoogleFileStore, error) {
 	googleStorageClient, err := storage.NewClient(context.Background(), option.WithCredentialsJSON([]byte(jsonKey)))
 
 	if err != nil {
-		return GoogleFileStorage{}, werror.WrapError("Failed to create Google Cloud Storage client", err)
+		return GoogleFileStore{}, werror.WrapError("Failed to create Google Cloud Storage client", err)
 	}
 
-	return GoogleFileStorage{
+	return GoogleFileStore{
 		storageClient: googleStorageClient,
 	}, nil
 }
 
-func (g GoogleFileStorage) GetFile(ctx context.Context, fileURL string) ([]byte, error) {
+func (g GoogleFileStore) GetFile(ctx context.Context, fileURL string) ([]byte, error) {
 	bucket, filePath, err := g.bucketAndPathFromURL(fileURL)
 	if err != nil {
 		return nil, werror.WrapError("Couldn't extract file path from URL", err)
@@ -53,7 +53,7 @@ func (g GoogleFileStorage) GetFile(ctx context.Context, fileURL string) ([]byte,
 	return contents, nil
 }
 
-func (g GoogleFileStorage) WriteFile(ctx context.Context, fileURL string, fileContent []byte) (err error) {
+func (g GoogleFileStore) WriteFile(ctx context.Context, fileURL string, fileContent []byte) (err error) {
 	bucket, filePath, err := g.bucketAndPathFromURL(fileURL)
 	if err != nil {
 		return werror.WrapError("Couldn't extract file path from URL", err)
@@ -75,7 +75,7 @@ func (g GoogleFileStorage) WriteFile(ctx context.Context, fileURL string, fileCo
 	return nil
 }
 
-func (g GoogleFileStorage) bucketAndPathFromURL(fileURL string) (string, string, error) {
+func (g GoogleFileStore) bucketAndPathFromURL(fileURL string) (string, string, error) {
 	if !strings.HasPrefix(fileURL, GOOGLE_STORAGE_HOST+"/") {
 		return "", "", werror.WrapError("File path given not in the Google cloud storage format", nil)
 	}
@@ -93,6 +93,6 @@ func (g GoogleFileStorage) bucketAndPathFromURL(fileURL string) (string, string,
 	return bucket, path, nil
 }
 
-func (g GoogleFileStorage) objectHandle(bucket string, filePath string) *storage.ObjectHandle {
+func (g GoogleFileStore) objectHandle(bucket string, filePath string) *storage.ObjectHandle {
 	return g.storageClient.Bucket(bucket).Object(filePath)
 }
