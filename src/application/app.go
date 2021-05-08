@@ -92,7 +92,7 @@ func newWorker(consumerConn *amqp.Connection, producerConn *amqp.Connection) wor
 }
 
 func queueName() string {
-	return getEnvOrPanic("RABBITMQ_QUEUE_NAME")
+	return "chord-paper-tracks"
 }
 
 func newPublisher(conn *amqp.Connection) publish.RabbitMQPublisher {
