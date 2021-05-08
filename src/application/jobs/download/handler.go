@@ -15,10 +15,8 @@ import (
 
 var _ worker.MessageHandler = JobHandler{}
 
-func CreateJobMessage(sourceURL string, tracklistID string, trackID string, splitType string) (amqp.Publishing, error) {
+func CreateJobMessage(tracklistID string, trackID string) (amqp.Publishing, error) {
 	params := JobParams{
-		SplitType:   splitType,
-		SourceURL:   sourceURL,
 		TrackListID: tracklistID,
 		TrackID:     trackID,
 	}
@@ -37,9 +35,7 @@ func CreateJobMessage(sourceURL string, tracklistID string, trackID string, spli
 const JobType string = "download_original"
 
 type JobParams struct {
-	SplitType   string `json:"split_type"`
-	SourceURL   string `json:"source_url"`
-	TrackListID string `json:"track_list_id"`
+	TrackListID string `json:"tracklist_id"`
 	TrackID     string `json:"track_id"`
 }
 
@@ -60,18 +56,17 @@ func (JobHandler) JobType() string {
 }
 
 func (d JobHandler) HandleMessage(message []byte) error {
-	params := JobParams{}
-	err := json.Unmarshal(message, &params)
+	params, err := unmarshalMessage(message)
 	if err != nil {
 		return werror.WrapError("Failed to unmarshal message JSON", err)
 	}
 
-	originalURL, err := d.trackDownloader.Download(params.SourceURL, params.TrackListID, params.TrackID)
+	savedOriginalURL, err := d.trackDownloader.Download(params.TrackListID, params.TrackID)
 	if err != nil {
 		return werror.WrapError("Failed to download track", err)
 	}
 
-	err = d.publishSplitTrackMessage(originalURL, params.TrackListID, params.TrackID, params.SplitType)
+	err = d.publishSplitTrackMessage(savedOriginalURL, params.TrackListID, params.TrackID)
 	if err != nil {
 		return werror.WrapError("Failed to publish the next job message", err)
 	}
@@ -79,9 +74,9 @@ func (d JobHandler) HandleMessage(message []byte) error {
 	return nil
 }
 
-func (d JobHandler) publishSplitTrackMessage(originalURL string, trackListID string, trackID string, splitType string) error {
+func (d JobHandler) publishSplitTrackMessage(savedOriginalURL string, trackListID string, trackID string) error {
 	log.Info("Creating split track job message")
-	job, err := split.CreateJobMessage(originalURL, trackListID, trackID, splitType)
+	job, err := split.CreateJobMessage(savedOriginalURL, trackListID, trackID)
 	if err != nil {
 		return werror.WrapError("Failed to create split job params", err)
 	}
@@ -93,4 +88,22 @@ func (d JobHandler) publishSplitTrackMessage(originalURL string, trackListID str
 	}
 
 	return nil
+}
+
+func unmarshalMessage(message []byte) (JobParams, error) {
+	params := JobParams{}
+	err := json.Unmarshal(message, &params)
+	if err != nil {
+		return JobParams{}, werror.WrapError("Failed to unmarshal message JSON", err)
+	}
+
+	if params.TrackListID == "" {
+		return JobParams{}, werror.WrapError("Missing tracklist ID", err)
+	}
+
+	if params.TrackID == "" {
+		return JobParams{}, werror.WrapError("Missing track ID", err)
+	}
+
+	return params, nil
 }

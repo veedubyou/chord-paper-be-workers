@@ -17,9 +17,9 @@ import (
 var _ splitter.FileSplitter = LocalFileSplitter{}
 
 var paramMap = map[splitter.SplitType]string{
-	splitter.TwoStemSplitType:  "spleeter:2stems-16khz",
-	splitter.FourStemSplitType: "spleeter:4stems-16khz",
-	splitter.FiveStemSplitType: "spleeter:5stems-16khz",
+	splitter.SplitTwoStemsType:  "spleeter:2stems-16khz",
+	splitter.SplitFourStemsType: "spleeter:4stems-16khz",
+	splitter.SplitFiveStemsType: "spleeter:5stems-16khz",
 }
 
 func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string) (LocalFileSplitter, error) {

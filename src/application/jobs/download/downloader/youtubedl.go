@@ -2,18 +2,18 @@ package downloader
 
 import (
 	"chord-paper-be-workers/src/application/cloud_storage/entity"
+	"chord-paper-be-workers/src/application/executor"
 	"chord-paper-be-workers/src/lib/werror"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/apex/log"
 )
 
-func NewYoutubeDLer(youtubedlBinPath string, workingDirStr string, fileStore entity.FileStore) (YoutubeDLer, error) {
+func NewYoutubeDLer(youtubedlBinPath string, workingDirStr string, fileStore entity.FileStore, commandExecutor executor.Executor) (YoutubeDLer, error) {
 	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
 		return YoutubeDLer{}, werror.WrapError("Failed to create working dir", err)
@@ -23,6 +23,7 @@ func NewYoutubeDLer(youtubedlBinPath string, workingDirStr string, fileStore ent
 		youtubedlBinPath: youtubedlBinPath,
 		workingDir:       workingDir,
 		fileStore:        fileStore,
+		commandExecutor:  commandExecutor,
 	}, nil
 }
 
@@ -30,6 +31,7 @@ type YoutubeDLer struct {
 	youtubedlBinPath string
 	workingDir       working_dir.WorkingDir
 	fileStore        entity.FileStore
+	commandExecutor  executor.Executor
 }
 
 func (y YoutubeDLer) Download(sourceURL string, destinationURL string) error {
@@ -49,7 +51,7 @@ func (y YoutubeDLer) Download(sourceURL string, destinationURL string) error {
 
 	log.Info("Running youtube-dl")
 
-	cmd := exec.Command(y.youtubedlBinPath, "-o", outputPath, "-x", "--audio-format", "mp3", "--audio-quality", "0", sourceURL)
+	cmd := y.commandExecutor.Command(y.youtubedlBinPath, "-o", outputPath, "-x", "--audio-format", "mp3", "--audio-quality", "0", sourceURL)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Error(string(output))
