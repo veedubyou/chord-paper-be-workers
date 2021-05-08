@@ -6,8 +6,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 var _ Publisher = RabbitMQPublisher{}
 
+//counterfeiter:generate . Publisher
 type Publisher interface {
 	Publish(msg amqp.Publishing) error
 }

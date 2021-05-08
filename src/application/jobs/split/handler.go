@@ -16,12 +16,11 @@ import (
 
 var _ worker.MessageHandler = JobHandler{}
 
-func CreateJobMessage(originalURL string, tracklistID string, trackID string, splitType string) (amqp.Publishing, error) {
+func CreateJobMessage(savedOriginalURL string, tracklistID string, trackID string) (amqp.Publishing, error) {
 	job := JobParams{
-		TrackListID: tracklistID,
-		TrackID:     trackID,
-		SplitType:   splitType,
-		OriginalURL: originalURL,
+		TrackListID:      tracklistID,
+		TrackID:          trackID,
+		SavedOriginalURL: savedOriginalURL,
 	}
 
 	jsonBytes, err := json.Marshal(job)
@@ -38,10 +37,9 @@ func CreateJobMessage(originalURL string, tracklistID string, trackID string, sp
 const JobType string = "split_track"
 
 type JobParams struct {
-	SplitType   string `json:"split_type"`
-	OriginalURL string `json:"original_url"`
-	TrackListID string `json:"track_list_id"`
-	TrackID     string `json:"track_id"`
+	TrackListID      string `json:"tracklist_id"`
+	TrackID          string `json:"track_id"`
+	SavedOriginalURL string `json:"saved_original_url"`
 }
 
 func NewJobHandler(splitter splitter.TrackSplitter, publisher publish.Publisher) JobHandler {
@@ -67,17 +65,12 @@ func (s JobHandler) HandleMessage(message []byte) error {
 		return werror.WrapError("Failed to unmarshal message JSON", err)
 	}
 
-	splitType, err := splitter.ConvertToSplitType(params.SplitType)
-	if err != nil {
-		return werror.WrapError("Unexpected split type in job params", err)
-	}
-
-	stemURLs, err := s.splitter.SplitTrack(context.Background(), params.OriginalURL, params.TrackListID, params.TrackID, splitType)
+	stemURLs, err := s.splitter.SplitTrack(context.Background(), params.TrackListID, params.TrackID, params.SavedOriginalURL)
 	if err != nil {
 		return werror.WrapError("Failed to split the track", err)
 	}
 
-	err = s.publishSaveDBMessage(params.TrackListID, params.TrackID, params.SplitType, stemURLs)
+	err = s.publishSaveDBMessage(params.TrackListID, params.TrackID, stemURLs)
 	if err != nil {
 		return werror.WrapError("Failed to publish the next job message", err)
 	}
@@ -85,9 +78,9 @@ func (s JobHandler) HandleMessage(message []byte) error {
 	return nil
 }
 
-func (s JobHandler) publishSaveDBMessage(trackListID string, trackID string, trackType string, stemURLs splitter.StemFilePaths) error {
+func (s JobHandler) publishSaveDBMessage(trackListID string, trackID string, stemURLs splitter.StemFilePaths) error {
 	log.Info("Creating save to DB job message")
-	job, err := save_stems_to_db.CreateJobMessage(trackListID, trackID, trackType, stemURLs)
+	job, err := save_stems_to_db.CreateJobMessage(trackListID, trackID, stemURLs)
 	if err != nil {
 		return werror.WrapError("Failed to create save DB job params", err)
 	}

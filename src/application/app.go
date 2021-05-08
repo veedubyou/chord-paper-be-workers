@@ -1,16 +1,18 @@
 package application
 
 import (
-	"chord-paper-be-workers/src/application/cloud_storage/store"
+	filestore "chord-paper-be-workers/src/application/cloud_storage/store"
+	"chord-paper-be-workers/src/application/executor"
 	"chord-paper-be-workers/src/application/jobs/download"
 	"chord-paper-be-workers/src/application/jobs/download/downloader"
 	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
-	trackstore "chord-paper-be-workers/src/application/jobs/save_stems_to_db/store"
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/application/jobs/split/splitter/file_splitter"
 	"chord-paper-be-workers/src/application/publish"
+	trackstore "chord-paper-be-workers/src/application/tracks/store"
 	"chord-paper-be-workers/src/application/worker"
+	"chord-paper-be-workers/src/lib/env"
 	"fmt"
 	"os"
 	"strconv"
@@ -59,12 +61,12 @@ func NewApp() App {
 
 func (a *App) Start() {
 	for _, queueWorker := range a.workers {
-		go func() {
-			err := queueWorker.Start()
+		go func(worker worker.QueueWorker) {
+			err := worker.Start()
 			if err != nil {
 				log.Error("Failed to start worker!")
 			}
-		}()
+		}(queueWorker)
 	}
 }
 
@@ -99,10 +101,10 @@ func newPublisher(conn *amqp.Connection) publish.RabbitMQPublisher {
 	return publisher
 }
 
-func newGoogleFileStore() store.GoogleFileStore {
+func newGoogleFileStore() filestore.GoogleFileStore {
 	jsonKey := getEnvOrPanic("GOOGLE_CLOUD_KEY")
 
-	fileStore, err := store.NewGoogleFileStore(jsonKey)
+	fileStore, err := filestore.NewGoogleFileStore(jsonKey)
 	ensureOk(err)
 	return fileStore
 }
@@ -113,11 +115,12 @@ func newDownloadJobHandler(publisher publish.Publisher) download.JobHandler {
 	err := os.MkdirAll(workingDir, os.ModePerm)
 	ensureOk(err)
 
-	dler, err := downloader.NewYoutubeDLer(youtubeDLBinPath, workingDir, newGoogleFileStore())
+	dler, err := downloader.NewYoutubeDLer(youtubeDLBinPath, workingDir, newGoogleFileStore(), executor.BinaryFileExecutor{})
 	ensureOk(err)
 
+	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
 	bucketName := getEnvOrPanic("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
-	trackDownloader := downloader.NewTrackDownloader(dler, bucketName)
+	trackDownloader := downloader.NewTrackDownloader(dler, trackStore, bucketName)
 
 	return download.NewJobHandler(trackDownloader, publisher)
 }
@@ -135,12 +138,13 @@ func newSplitJobHandler(publisher publish.Publisher) split.JobHandler {
 	remoteUsecase, err := file_splitter.NewRemoteFileSplitter(workingDir, googleFileStore, localUsecase)
 	ensureOk(err)
 
-	songSplitUsecase := splitter.NewTrackSplitter(remoteUsecase, "chord-paper-tracks")
+	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
+	songSplitUsecase := splitter.NewTrackSplitter(remoteUsecase, trackStore, "chord-paper-tracks")
 
 	return split.NewJobHandler(songSplitUsecase, publisher)
 }
 
 func newSaveToDBJobHandler() save_stems_to_db.JobHandler {
-	trackStore := trackstore.NewDynamoDBTrackStore()
+	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
 	return save_stems_to_db.NewJobHandler(trackStore)
 }
