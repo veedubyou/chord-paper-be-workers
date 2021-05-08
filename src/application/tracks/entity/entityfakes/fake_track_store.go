@@ -23,18 +23,18 @@ type FakeTrackStore struct {
 		result1 entity.Track
 		result2 error
 	}
-	PutTrackStub        func(context.Context, string, string, entity.Track) error
-	putTrackMutex       sync.RWMutex
-	putTrackArgsForCall []struct {
+	SetTrackStub        func(context.Context, string, string, entity.Track) error
+	setTrackMutex       sync.RWMutex
+	setTrackArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
 		arg4 entity.Track
 	}
-	putTrackReturns struct {
+	setTrackReturns struct {
 		result1 error
 	}
-	putTrackReturnsOnCall map[int]struct {
+	setTrackReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -107,19 +107,19 @@ func (fake *FakeTrackStore) GetTrackReturnsOnCall(i int, result1 entity.Track, r
 	}{result1, result2}
 }
 
-func (fake *FakeTrackStore) PutTrack(arg1 context.Context, arg2 string, arg3 string, arg4 entity.Track) error {
-	fake.putTrackMutex.Lock()
-	ret, specificReturn := fake.putTrackReturnsOnCall[len(fake.putTrackArgsForCall)]
-	fake.putTrackArgsForCall = append(fake.putTrackArgsForCall, struct {
+func (fake *FakeTrackStore) SetTrack(arg1 context.Context, arg2 string, arg3 string, arg4 entity.Track) error {
+	fake.setTrackMutex.Lock()
+	ret, specificReturn := fake.setTrackReturnsOnCall[len(fake.setTrackArgsForCall)]
+	fake.setTrackArgsForCall = append(fake.setTrackArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
 		arg4 entity.Track
 	}{arg1, arg2, arg3, arg4})
-	stub := fake.PutTrackStub
-	fakeReturns := fake.putTrackReturns
-	fake.recordInvocation("PutTrack", []interface{}{arg1, arg2, arg3, arg4})
-	fake.putTrackMutex.Unlock()
+	stub := fake.SetTrackStub
+	fakeReturns := fake.setTrackReturns
+	fake.recordInvocation("SetTrack", []interface{}{arg1, arg2, arg3, arg4})
+	fake.setTrackMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2, arg3, arg4)
 	}
@@ -129,44 +129,44 @@ func (fake *FakeTrackStore) PutTrack(arg1 context.Context, arg2 string, arg3 str
 	return fakeReturns.result1
 }
 
-func (fake *FakeTrackStore) PutTrackCallCount() int {
-	fake.putTrackMutex.RLock()
-	defer fake.putTrackMutex.RUnlock()
-	return len(fake.putTrackArgsForCall)
+func (fake *FakeTrackStore) SetTrackCallCount() int {
+	fake.setTrackMutex.RLock()
+	defer fake.setTrackMutex.RUnlock()
+	return len(fake.setTrackArgsForCall)
 }
 
-func (fake *FakeTrackStore) PutTrackCalls(stub func(context.Context, string, string, entity.Track) error) {
-	fake.putTrackMutex.Lock()
-	defer fake.putTrackMutex.Unlock()
-	fake.PutTrackStub = stub
+func (fake *FakeTrackStore) SetTrackCalls(stub func(context.Context, string, string, entity.Track) error) {
+	fake.setTrackMutex.Lock()
+	defer fake.setTrackMutex.Unlock()
+	fake.SetTrackStub = stub
 }
 
-func (fake *FakeTrackStore) PutTrackArgsForCall(i int) (context.Context, string, string, entity.Track) {
-	fake.putTrackMutex.RLock()
-	defer fake.putTrackMutex.RUnlock()
-	argsForCall := fake.putTrackArgsForCall[i]
+func (fake *FakeTrackStore) SetTrackArgsForCall(i int) (context.Context, string, string, entity.Track) {
+	fake.setTrackMutex.RLock()
+	defer fake.setTrackMutex.RUnlock()
+	argsForCall := fake.setTrackArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
-func (fake *FakeTrackStore) PutTrackReturns(result1 error) {
-	fake.putTrackMutex.Lock()
-	defer fake.putTrackMutex.Unlock()
-	fake.PutTrackStub = nil
-	fake.putTrackReturns = struct {
+func (fake *FakeTrackStore) SetTrackReturns(result1 error) {
+	fake.setTrackMutex.Lock()
+	defer fake.setTrackMutex.Unlock()
+	fake.SetTrackStub = nil
+	fake.setTrackReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeTrackStore) PutTrackReturnsOnCall(i int, result1 error) {
-	fake.putTrackMutex.Lock()
-	defer fake.putTrackMutex.Unlock()
-	fake.PutTrackStub = nil
-	if fake.putTrackReturnsOnCall == nil {
-		fake.putTrackReturnsOnCall = make(map[int]struct {
+func (fake *FakeTrackStore) SetTrackReturnsOnCall(i int, result1 error) {
+	fake.setTrackMutex.Lock()
+	defer fake.setTrackMutex.Unlock()
+	fake.SetTrackStub = nil
+	if fake.setTrackReturnsOnCall == nil {
+		fake.setTrackReturnsOnCall = make(map[int]struct {
 			result1 error
 		})
 	}
-	fake.putTrackReturnsOnCall[i] = struct {
+	fake.setTrackReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -176,8 +176,8 @@ func (fake *FakeTrackStore) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.getTrackMutex.RLock()
 	defer fake.getTrackMutex.RUnlock()
-	fake.putTrackMutex.RLock()
-	defer fake.putTrackMutex.RUnlock()
+	fake.setTrackMutex.RLock()
+	defer fake.setTrackMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
