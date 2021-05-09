@@ -4,14 +4,10 @@ import "os/exec"
 
 var _ Executor = BinaryFileExecutor{}
 
-//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
-
-//counterfeiter:generate . Executor
 type Executor interface {
 	Command(name string, arg ...string) Command
 }
 
-//counterfeiter:generate . Command
 type Command interface {
 	SetDir(dir string)
 	CombinedOutput() ([]byte, error)
