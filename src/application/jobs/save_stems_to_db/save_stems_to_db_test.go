@@ -1,10 +1,11 @@
 package save_stems_to_db_test
 
 import (
+	"chord-paper-be-workers/src/application/integration_test/dummy"
 	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
-	entityfakes2 "chord-paper-be-workers/src/application/track_store/entity/entityfakes"
+	"chord-paper-be-workers/src/application/tracks/entity"
+	"context"
 	"encoding/json"
-	"errors"
 
 	. "github.com/onsi/gomega"
 
@@ -13,13 +14,38 @@ import (
 
 var _ = Describe("JobHandler", func() {
 	var (
-		fakeStore *entityfakes2.FakeTrackStore
-		handler   save_stems_to_db.JobHandler
+		tracklistID string
+		trackID     string
+		trackType   entity.TrackType
+
+		dummyTrackStore *dummy.TrackStore
+		handler         save_stems_to_db.JobHandler
 	)
 
 	BeforeEach(func() {
-		fakeStore = &entityfakes2.FakeTrackStore{}
-		handler = save_stems_to_db.NewJobHandler(fakeStore)
+		tracklistID = "tracklist-ID"
+		trackID = "track-ID"
+		trackType = entity.InvalidType
+
+		dummyTrackStore = dummy.NewDummyTrackStore()
+		handler = save_stems_to_db.NewJobHandler(dummyTrackStore)
+	})
+
+	JustBeforeEach(func() {
+		Expect(trackType).NotTo(Equal(entity.InvalidType))
+
+		prevUnavailable := dummyTrackStore.Unavailable
+		dummyTrackStore.Unavailable = false
+
+		err := dummyTrackStore.SetTrack(context.Background(), tracklistID, trackID, entity.SplitStemTrack{
+			BaseTrack: entity.BaseTrack{
+				TrackType: trackType,
+			},
+			OriginalURL: "https://whocares",
+		})
+
+		dummyTrackStore.Unavailable = prevUnavailable
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("Handle message", func() {
@@ -31,54 +57,156 @@ var _ = Describe("JobHandler", func() {
 
 		Describe("Well formed job message", func() {
 			var (
+				stemURLs  map[string]string
 				jobParams save_stems_to_db.JobParams
 			)
 
-			BeforeEach(func() {
-				jobParams = save_stems_to_db.JobParams{
-					TrackListID:  "tracklist-id",
-					TrackID:      "track-id",
-					NewTrackType: "4stems",
-					StemURLS: map[string]string{
-						"bass":   "bass.mp3",
-						"drums":  "drums.mp3",
+			Describe("2stems", func() {
+				BeforeEach(func() {
+					stemURLs = map[string]string{
+						"vocals":        "vocals.mp3",
+						"accompaniment": "accompaniment.mp3",
+					}
+					jobParams = save_stems_to_db.JobParams{
+						TrackListID: tracklistID,
+						TrackID:     trackID,
+						StemURLS:    stemURLs,
+					}
+					trackType = entity.SplitTwoStemsType
+
+					var err error
+					messageBytes, err = json.Marshal(jobParams)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				Describe("Store saves successfully", func() {
+					It("does not error", func() {
+						err := handler.HandleMessage(messageBytes)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					It("updates the track store", func() {
+						_ = handler.HandleMessage(messageBytes)
+						track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
+						Expect(err).NotTo(HaveOccurred())
+						stemTrack, ok := track.(entity.StemTrack)
+						Expect(ok).To(BeTrue())
+						Expect(stemTrack.TrackType).To(Equal(entity.TwoStemsType))
+						Expect(stemTrack.StemURLs).To(Equal(stemURLs))
+					})
+				})
+
+				Describe("Store is unavailable", func() {
+					BeforeEach(func() {
+						dummyTrackStore.Unavailable = true
+					})
+
+					It("also returns a failure", func() {
+						err := handler.HandleMessage(messageBytes)
+						Expect(err).To(HaveOccurred())
+					})
+				})
+			})
+
+			Describe("4stems", func() {
+				BeforeEach(func() {
+					stemURLs = map[string]string{
 						"vocals": "vocals.mp3",
 						"other":  "other.mp3",
-					},
-				}
+						"bass":   "bass.mp3",
+						"drums":  "drums.mp3",
+					}
+					jobParams = save_stems_to_db.JobParams{
+						TrackListID: tracklistID,
+						TrackID:     trackID,
+						StemURLS:    stemURLs,
+					}
+					trackType = entity.SplitFourStemsType
 
-				var err error
-				messageBytes, err = json.Marshal(jobParams)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			Describe("Store saves successfully", func() {
-				BeforeEach(func() {
-					fakeStore.WriteTrackStemsReturns(nil)
-				})
-
-				It("also returns a failure", func() {
-					err := handler.HandleMessage(messageBytes)
+					var err error
+					messageBytes, err = json.Marshal(jobParams)
 					Expect(err).NotTo(HaveOccurred())
+				})
 
-					_, receivedTrackListID, receivedTrackID, receivedTrackType, receivedStemURLs := fakeStore.WriteTrackStemsArgsForCall(0)
-					Expect(receivedTrackListID).To(Equal(jobParams.TrackListID))
-					Expect(receivedTrackID).To(Equal(jobParams.TrackID))
-					Expect(receivedTrackType).To(Equal(jobParams.NewTrackType))
-					Expect(receivedStemURLs).To(Equal(jobParams.StemURLS))
+				Describe("Store saves successfully", func() {
+					It("does not error", func() {
+						err := handler.HandleMessage(messageBytes)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					It("updates the track store", func() {
+						_ = handler.HandleMessage(messageBytes)
+						track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
+						Expect(err).NotTo(HaveOccurred())
+						stemTrack, ok := track.(entity.StemTrack)
+						Expect(ok).To(BeTrue())
+						Expect(stemTrack.TrackType).To(Equal(entity.FourStemsType))
+						Expect(stemTrack.StemURLs).To(Equal(stemURLs))
+					})
+				})
+
+				Describe("Store is unavailable", func() {
+					BeforeEach(func() {
+						dummyTrackStore.Unavailable = true
+					})
+
+					It("also returns a failure", func() {
+						err := handler.HandleMessage(messageBytes)
+						Expect(err).To(HaveOccurred())
+					})
 				})
 			})
 
-			Describe("Store fails to saves", func() {
+			Describe("5stems", func() {
 				BeforeEach(func() {
-					fakeStore.WriteTrackStemsReturns(errors.New("i fail"))
+					stemURLs = map[string]string{
+						"vocals": "vocals.mp3",
+						"other":  "other.mp3",
+						"bass":   "bass.mp3",
+						"drums":  "drums.mp3",
+						"piano":  "piano.mp3",
+					}
+					jobParams = save_stems_to_db.JobParams{
+						TrackListID: tracklistID,
+						TrackID:     trackID,
+						StemURLS:    stemURLs,
+					}
+					trackType = entity.SplitFiveStemsType
+
+					var err error
+					messageBytes, err = json.Marshal(jobParams)
+					Expect(err).NotTo(HaveOccurred())
 				})
 
-				It("also returns a failure", func() {
-					err := handler.HandleMessage(messageBytes)
-					Expect(err).To(HaveOccurred())
+				Describe("Store saves successfully", func() {
+					It("does not error", func() {
+						err := handler.HandleMessage(messageBytes)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					It("updates the track store", func() {
+						_ = handler.HandleMessage(messageBytes)
+						track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
+						Expect(err).NotTo(HaveOccurred())
+						stemTrack, ok := track.(entity.StemTrack)
+						Expect(ok).To(BeTrue())
+						Expect(stemTrack.TrackType).To(Equal(entity.FiveStemsType))
+						Expect(stemTrack.StemURLs).To(Equal(stemURLs))
+					})
+				})
+
+				Describe("Store is unavailable", func() {
+					BeforeEach(func() {
+						dummyTrackStore.Unavailable = true
+					})
+
+					It("also returns a failure", func() {
+						err := handler.HandleMessage(messageBytes)
+						Expect(err).To(HaveOccurred())
+					})
 				})
 			})
+
 		})
 
 		Describe("Malformed job message", func() {
@@ -86,12 +214,13 @@ var _ = Describe("JobHandler", func() {
 				jobParams := save_stems_to_db.JobParams{
 					TrackListID: "tracklist-id",
 					TrackID:     "track-id",
-					StemURLS:    map[string]string{"bass": "bass.mp3"},
 				}
 
 				var err error
 				messageBytes, err = json.Marshal(jobParams)
 				Expect(err).NotTo(HaveOccurred())
+
+				trackType = entity.TwoStemsType
 			})
 
 			It("returns error", func() {
