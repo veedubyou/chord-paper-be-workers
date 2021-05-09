@@ -9,10 +9,18 @@ import (
 
 var _ publish.Publisher = &RabbitMQ{}
 var _ worker.MessageChannel = &RabbitMQ{}
+var _ amqp.Acknowledger = RabbitMQAcknowledger{}
 
 type RabbitMQ struct {
+	AckCounter     int
+	NackCounter    int
 	Unavailable    bool
 	MessageChannel chan amqp.Delivery
+}
+
+type RabbitMQAcknowledger struct {
+	ack  func()
+	nack func()
 }
 
 func NewRabbitMQ() *RabbitMQ {
@@ -27,7 +35,17 @@ func (r *RabbitMQ) Publish(msg amqp.Publishing) error {
 		return NetworkFailure
 	}
 
+	acknowledger := RabbitMQAcknowledger{
+		ack: func() {
+			r.AckCounter++
+		},
+		nack: func() {
+			r.NackCounter++
+		},
+	}
+
 	r.MessageChannel <- amqp.Delivery{
+		Acknowledger:    acknowledger,
 		ContentType:     msg.ContentType,
 		ContentEncoding: msg.ContentEncoding,
 		DeliveryMode:    msg.DeliveryMode,
@@ -47,5 +65,18 @@ func (r *RabbitMQ) Consume(_ string, _ string, _ bool, _ bool, _ bool, _ bool, _
 }
 
 func (r *RabbitMQ) Close() error {
+	return nil
+}
+
+func (r RabbitMQAcknowledger) Ack(tag uint64, multiple bool) error {
+	r.ack()
+	return nil
+}
+func (r RabbitMQAcknowledger) Nack(tag uint64, multiple bool, requeue bool) error {
+	r.nack()
+	return nil
+}
+func (r RabbitMQAcknowledger) Reject(tag uint64, requeue bool) error {
+	r.nack()
 	return nil
 }
