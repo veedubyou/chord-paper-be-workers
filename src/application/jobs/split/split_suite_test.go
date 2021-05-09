@@ -1,4 +1,4 @@
-package download_test
+package split_test
 
 import (
 	"os"
@@ -8,9 +8,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestDownload(t *testing.T) {
+func TestSplit(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Download Suite")
+	RunSpecs(t, "Split Suite")
 }
 
 var workingDir string

@@ -3,6 +3,7 @@ package download_test
 import (
 	"chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/integration_test/dummy"
+	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/tracks/entity"
 	"context"
 	"fmt"
@@ -46,7 +47,7 @@ var _ = Describe("Download Job Handler", func() {
 			tracklistID = "tracklist-id"
 			trackID = "track-id"
 			originalURL = "https://some-third-party/coolsong.mp3"
-			originalTrackData = []byte("cool jamz")
+			originalTrackData = []byte("cool_jamz")
 
 			dummyTrackStore = dummy.NewDummyTrackStore()
 			dummyFileStore = dummy.NewDummyFileStore()
@@ -91,18 +92,34 @@ var _ = Describe("Download Job Handler", func() {
 		})
 
 		Describe("Happy path", func() {
+			var err error
+			var expectedSavedURL string
+
+			BeforeEach(func() {
+				err = handler.HandleMessage(message)
+				expectedSavedURL = fmt.Sprintf("%s/%s/%s/%s/original/original.mp3", store.GOOGLE_STORAGE_HOST, bucketName, tracklistID, trackID)
+			})
+
 			It("doesn't return an error", func() {
-				err := handler.HandleMessage(message)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("saved the track to the file store", func() {
-				_ = handler.HandleMessage(message)
-
-				expectedURL := fmt.Sprintf("%s/%s/%s/%s/original/original.mp3", store.GOOGLE_STORAGE_HOST, bucketName, tracklistID, trackID)
-				contents, err := dummyFileStore.GetFile(context.Background(), expectedURL)
+				contents, err := dummyFileStore.GetFile(context.Background(), expectedSavedURL)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(contents).To(Equal(originalTrackData))
+			})
+
+			It("publishes the next job", func() {
+				msg := fakePublisher.PublishArgsForCall(0)
+				Expect(msg.Type).To(Equal(split.JobType))
+
+				var splitJob split.JobParams
+				err := json.Unmarshal(msg.Body, &splitJob)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(splitJob.TrackListID).To(Equal(tracklistID))
+				Expect(splitJob.TrackID).To(Equal(trackID))
+				Expect(splitJob.SavedOriginalURL).To(Equal(expectedSavedURL))
 			})
 		})
 

@@ -39,6 +39,8 @@ func (y YoutubeDLExecutor) Command(_ string, arg ...string) executor.Command {
 	}
 }
 
+func (y YoutubeDLCommand) SetDir(_ string) {}
+
 func (y YoutubeDLCommand) CombinedOutput() ([]byte, error) {
 	if y.Args[0] != "-o" {
 		return nil, UnexpectedInput

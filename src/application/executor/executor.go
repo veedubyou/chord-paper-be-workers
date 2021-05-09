@@ -13,6 +13,7 @@ type Executor interface {
 
 //counterfeiter:generate . Command
 type Command interface {
+	SetDir(dir string)
 	CombinedOutput() ([]byte, error)
 }
 
@@ -20,5 +21,20 @@ type Command interface {
 type BinaryFileExecutor struct{}
 
 func (b BinaryFileExecutor) Command(name string, arg ...string) Command {
-	return exec.Command(name, arg...)
+	return &BinaryFileCommand{
+		cmd: exec.Command(name, arg...),
+	}
+
+}
+
+type BinaryFileCommand struct {
+	cmd *exec.Cmd
+}
+
+func (b *BinaryFileCommand) SetDir(dir string) {
+	b.cmd.Dir = dir
+}
+
+func (b *BinaryFileCommand) CombinedOutput() ([]byte, error) {
+	return b.cmd.CombinedOutput()
 }
