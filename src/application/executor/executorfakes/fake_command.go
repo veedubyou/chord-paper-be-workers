@@ -19,6 +19,11 @@ type FakeCommand struct {
 		result1 []byte
 		result2 error
 	}
+	SetDirStub        func(string)
+	setDirMutex       sync.RWMutex
+	setDirArgsForCall []struct {
+		arg1 string
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -79,11 +84,45 @@ func (fake *FakeCommand) CombinedOutputReturnsOnCall(i int, result1 []byte, resu
 	}{result1, result2}
 }
 
+func (fake *FakeCommand) SetDir(arg1 string) {
+	fake.setDirMutex.Lock()
+	fake.setDirArgsForCall = append(fake.setDirArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.SetDirStub
+	fake.recordInvocation("SetDir", []interface{}{arg1})
+	fake.setDirMutex.Unlock()
+	if stub != nil {
+		fake.SetDirStub(arg1)
+	}
+}
+
+func (fake *FakeCommand) SetDirCallCount() int {
+	fake.setDirMutex.RLock()
+	defer fake.setDirMutex.RUnlock()
+	return len(fake.setDirArgsForCall)
+}
+
+func (fake *FakeCommand) SetDirCalls(stub func(string)) {
+	fake.setDirMutex.Lock()
+	defer fake.setDirMutex.Unlock()
+	fake.SetDirStub = stub
+}
+
+func (fake *FakeCommand) SetDirArgsForCall(i int) string {
+	fake.setDirMutex.RLock()
+	defer fake.setDirMutex.RUnlock()
+	argsForCall := fake.setDirArgsForCall[i]
+	return argsForCall.arg1
+}
+
 func (fake *FakeCommand) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.combinedOutputMutex.RLock()
 	defer fake.combinedOutputMutex.RUnlock()
+	fake.setDirMutex.RLock()
+	defer fake.setDirMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
