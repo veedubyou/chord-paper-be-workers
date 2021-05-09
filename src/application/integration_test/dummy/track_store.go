@@ -7,30 +7,16 @@ import (
 
 var _ entity.TrackStore = &TrackStore{}
 
-type GetTrackInput struct {
-	TrackListID string
-	TrackID     string
+func NewDummyTrackStore() *TrackStore {
+	return &TrackStore{
+		Unavailable: false,
+		State:       make(map[string]map[string]entity.Track),
+	}
 }
 
 type TrackStore struct {
 	Unavailable bool
-	State       struct {
-		GetTrack struct {
-			Args struct {
-				TrackListID string
-				TrackID     string
-			}
-			Return struct {
-				Track entity.Track
-			}
-		}
-		SetTrack struct {
-			Args struct {
-				TrackListID string
-				TrackID     string
-			}
-		}
-	}
+	State       map[string]map[string]entity.Track
 }
 
 func (t TrackStore) GetTrack(_ context.Context, tracklistID string, trackID string) (entity.Track, error) {
@@ -38,13 +24,17 @@ func (t TrackStore) GetTrack(_ context.Context, tracklistID string, trackID stri
 		return entity.BaseTrack{}, NetworkFailure
 	}
 
-	method := t.State.GetTrack
-	args := method.Args
-	if args.TrackListID != tracklistID || args.TrackID != trackID {
+	trackMap, ok := t.State[tracklistID]
+	if !ok {
 		return entity.BaseTrack{}, NotFound
 	}
 
-	return method.Return.Track, nil
+	track, ok := trackMap[trackID]
+	if !ok {
+		return entity.BaseTrack{}, NotFound
+	}
+
+	return track, nil
 }
 
 func (t *TrackStore) SetTrack(_ context.Context, tracklistID string, trackID string, track entity.Track) error {
@@ -52,15 +42,11 @@ func (t *TrackStore) SetTrack(_ context.Context, tracklistID string, trackID str
 		return NetworkFailure
 	}
 
-	args := t.State.SetTrack.Args
-	if args.TrackListID != tracklistID || args.TrackID != trackID {
-		return NotFound
+	if t.State[tracklistID] == nil {
+		t.State[tracklistID] = make(map[string]entity.Track)
 	}
 
-	getTrack := t.State.GetTrack
-	getTrack.Args.TrackListID = tracklistID
-	getTrack.Args.TrackID = trackID
-	getTrack.Return.Track = track
+	t.State[tracklistID][trackID] = track
 
 	return nil
 }
