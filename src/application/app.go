@@ -131,7 +131,7 @@ func newSplitJobHandler(publisher publish.Publisher) split.JobHandler {
 	err := os.MkdirAll(workingDir, os.ModePerm)
 	ensureOk(err)
 
-	localUsecase, err := file_splitter.NewLocalFileSplitter(workingDir, spleeterBinPath)
+	localUsecase, err := file_splitter.NewLocalFileSplitter(workingDir, spleeterBinPath, executor.BinaryFileExecutor{})
 	ensureOk(err)
 
 	googleFileStore := newGoogleFileStore()

@@ -1,13 +1,13 @@
 package file_splitter
 
 import (
+	"chord-paper-be-workers/src/application/executor"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/lib/werror"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -22,7 +22,7 @@ var paramMap = map[splitter.SplitType]string{
 	splitter.SplitFiveStemsType: "spleeter:5stems-16khz",
 }
 
-func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string) (LocalFileSplitter, error) {
+func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string, executor executor.Executor) (LocalFileSplitter, error) {
 	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
 		return LocalFileSplitter{}, werror.WrapError("Failed to convert working dir to absolute format", err)
@@ -30,12 +30,14 @@ func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string) (LocalFi
 	return LocalFileSplitter{
 		workingDir:      workingDir,
 		spleeterBinPath: spleeterBinPath,
+		executor:        executor,
 	}, nil
 }
 
 type LocalFileSplitter struct {
 	workingDir      working_dir.WorkingDir
 	spleeterBinPath string
+	executor        executor.Executor
 }
 
 func (l LocalFileSplitter) SplitFile(ctx context.Context, originalTrackFilePath string, stemsOutputDir string, splitType splitter.SplitType) (splitter.StemFilePaths, error) {
@@ -75,8 +77,9 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 	}
 
 	logger.Info("Running spleeter command")
-	cmd := exec.Command(l.spleeterBinPath, "separate", "-i", sourcePath, "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3")
-	cmd.Dir = l.workingDir.Root()
+	cmd := l.executor.Command(l.spleeterBinPath, "separate", "-i", sourcePath, "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3")
+	cmd.SetDir(l.workingDir.Root())
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		errMsg := fmt.Sprintf("Error occurred while running spleeter - output: %s", string(output))
