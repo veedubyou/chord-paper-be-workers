@@ -32,33 +32,33 @@ func NewGoogleFileStore(jsonKey string) (GoogleFileStore, error) {
 }
 
 func (g GoogleFileStore) GetFile(ctx context.Context, fileURL string) ([]byte, error) {
-	errCtx := cerr.Field("file_url", fileURL)
+	errctx := cerr.Field("file_url", fileURL)
 	bucket, filePath, err := g.bucketAndPathFromURL(fileURL)
 	if err != nil {
-		return nil, errCtx.Wrap(err).Error("Couldn't extract file path from URL")
+		return nil, errctx.Wrap(err).Error("Couldn't extract file path from URL")
 	}
 
 	objectHandle := g.objectHandle(bucket, filePath)
 	reader, err := objectHandle.NewReader(ctx)
 	if err != nil {
-		return nil, errCtx.Wrap(err).Error("Failed to create reader for Google object handle")
+		return nil, errctx.Wrap(err).Error("Failed to create reader for Google object handle")
 	}
 
 	defer reader.Close()
 
 	contents, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, errCtx.Wrap(err).Error("Failed to read remote file")
+		return nil, errctx.Wrap(err).Error("Failed to read remote file")
 	}
 
 	return contents, nil
 }
 
 func (g GoogleFileStore) WriteFile(ctx context.Context, fileURL string, fileContent []byte) (err error) {
-	errCtx := cerr.Field("write_file_url", fileURL)
+	errctx := cerr.Field("write_file_url", fileURL)
 	bucket, filePath, err := g.bucketAndPathFromURL(fileURL)
 	if err != nil {
-		return errCtx.Wrap(err).Error("Couldn't extract file path from URL")
+		return errctx.Wrap(err).Error("Couldn't extract file path from URL")
 	}
 
 	objectHandle := g.objectHandle(bucket, filePath)
@@ -66,28 +66,28 @@ func (g GoogleFileStore) WriteFile(ctx context.Context, fileURL string, fileCont
 	defer func() {
 		closeErr := writer.Close()
 		if err == nil && closeErr != nil {
-			err = errCtx.Wrap(closeErr).Error("Error occurred when closing the upload stream")
+			err = errctx.Wrap(closeErr).Error("Error occurred when closing the upload stream")
 		}
 	}()
 
 	if _, err = writer.Write(fileContent); err != nil {
-		return errCtx.Wrap(err).Error("Error occurred when uploading file")
+		return errctx.Wrap(err).Error("Error occurred when uploading file")
 	}
 
 	return nil
 }
 
 func (g GoogleFileStore) bucketAndPathFromURL(fileURL string) (string, string, error) {
-	errCtx := cerr.Field("file_url", fileURL)
+	errctx := cerr.Field("file_url", fileURL)
 	if !strings.HasPrefix(fileURL, GOOGLE_STORAGE_HOST+"/") {
-		return "", "", errCtx.Error("File path given not in the Google cloud storage format")
+		return "", "", errctx.Error("File path given not in the Google cloud storage format")
 	}
 
 	bucketAndPath := strings.TrimPrefix(fileURL, GOOGLE_STORAGE_HOST+"/")
 
 	chunks := strings.SplitN(bucketAndPath, "/", 2)
 	if len(chunks) != 2 {
-		return "", "", errCtx.Error("File path given not in the Google cloud storage format")
+		return "", "", errctx.Error("File path given not in the Google cloud storage format")
 	}
 
 	bucket := chunks[0]

@@ -3,7 +3,7 @@ package file_splitter
 import (
 	cloudstorage "chord-paper-be-workers/src/application/cloud_storage/entity"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
 	"fmt"
@@ -19,7 +19,7 @@ var _ splitter.FileSplitter = RemoteFileSplitter{}
 func NewRemoteFileSplitter(workingDirStr string, remoteFileStore cloudstorage.FileStore, localSplitter LocalFileSplitter) (RemoteFileSplitter, error) {
 	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
-		return RemoteFileSplitter{}, werror.WrapError("Failed to create working directory object", err)
+		return RemoteFileSplitter{}, cerr.Wrap(err).Error("Failed to create working directory object")
 	}
 
 	return RemoteFileSplitter{
@@ -45,13 +45,13 @@ func (r RemoteFileSplitter) SplitFile(ctx context.Context, remoteSourcePath stri
 	logger.Info("Fetching file from remote file store")
 	fileContents, err := r.remoteFileStore.GetFile(ctx, remoteSourcePath)
 	if err != nil {
-		return nil, werror.WrapError("Failed to get remote file", err)
+		return nil, cerr.Wrap(err).Error("Failed to get remote file")
 	}
 
 	logger.Info("Creating temp directory to store the original track")
 	originalTrackDir, removeOriginalTrackDir, err := r.createTempDir("original")
 	if err != nil {
-		return nil, werror.WrapError("Failed to create directory to save original track", err)
+		return nil, cerr.Wrap(err).Error("Failed to create directory to save original track")
 	}
 
 	defer removeOriginalTrackDir()
@@ -59,13 +59,13 @@ func (r RemoteFileSplitter) SplitFile(ctx context.Context, remoteSourcePath stri
 	logger.Info("Writing original track into temp directory")
 	originalTrackFilePath := filepath.Join(originalTrackDir, "original.mp3")
 	if err := os.WriteFile(originalTrackFilePath, fileContents, os.ModePerm); err != nil {
-		return nil, werror.WrapError("Failed to write file temporarily to disk", err)
+		return nil, cerr.Wrap(err).Error("Failed to write file temporarily to disk")
 	}
 
 	logger.Info("Creating temp directory to store the split stem track")
 	stemTrackDir, removeStemTrackDir, err := r.createTempDir("stems")
 	if err != nil {
-		return nil, werror.WrapError("Failed to create directory to save stem tracks", err)
+		return nil, cerr.Wrap(err).Error("Failed to create directory to save stem tracks")
 	}
 
 	defer removeStemTrackDir()
@@ -73,13 +73,13 @@ func (r RemoteFileSplitter) SplitFile(ctx context.Context, remoteSourcePath stri
 	logger.Info("Starting to run the split operation")
 	localFilePaths, err := r.localSplitter.SplitFile(ctx, originalTrackFilePath, stemTrackDir, splitType)
 	if err != nil {
-		return nil, werror.WrapError("Failed to run local stem splitter", err)
+		return nil, cerr.Wrap(err).Error("Failed to run local stem splitter")
 	}
 
 	logger.Info("Uploading stem files")
 	remoteFilePaths, err := r.uploadStems(ctx, remoteDestPath, localFilePaths)
 	if err != nil {
-		return nil, werror.WrapError("Failed to upload stem files", err)
+		return nil, cerr.Wrap(err).Error("Failed to upload stem files")
 	}
 
 	return remoteFilePaths, nil
@@ -88,7 +88,7 @@ func (r RemoteFileSplitter) SplitFile(ctx context.Context, remoteSourcePath stri
 func (r RemoteFileSplitter) createTempDir(prefix string) (string, func(), error) {
 	tempDir, err := ioutil.TempDir(r.workingDir.TempDir(), fmt.Sprintf("%s-*", prefix))
 	if err != nil {
-		return "", nil, werror.WrapError("Failed to create a temporary directory", err)
+		return "", nil, cerr.Wrap(err).Error("Failed to create a temporary directory")
 	}
 
 	removeTempDirFn := func() {
@@ -112,14 +112,14 @@ func (r RemoteFileSplitter) uploadStem(ctx context.Context, done chan error, sou
 	fileContents, err := os.ReadFile(sourceStemFilePath)
 	if err != nil {
 		logger.Error("Failed to read local file")
-		done <- werror.WrapError("Failed to read local file", err)
+		done <- cerr.Wrap(err).Error("Failed to read local file")
 		return
 	}
 
 	err = r.remoteFileStore.WriteFile(ctx, destStemFilePath, fileContents)
 	if err != nil {
 		logger.Error("Failed to upload stem file")
-		done <- werror.WrapError("Failed to upload stem file", err)
+		done <- cerr.Wrap(err).Error("Failed to upload stem file")
 		return
 	}
 

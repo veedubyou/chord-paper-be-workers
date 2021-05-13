@@ -23,22 +23,22 @@ type TrackDownloader struct {
 }
 
 func (t TrackDownloader) Download(tracklistID string, trackID string) (string, error) {
-	errCtx := cerr.Field("tracklist_id", tracklistID).Field("track_id", trackID)
+	errctx := cerr.Field("tracklist_id", tracklistID).Field("track_id", trackID)
 	track, err := t.trackStore.GetTrack(context.Background(), tracklistID, trackID)
 	if err != nil {
-		return "", errCtx.Wrap(err).Error("Failed to GetTrack")
+		return "", errctx.Wrap(err).Error("Failed to GetTrack")
 	}
 
 	splitStemTrack, ok := track.(entity.SplitStemTrack)
 	if !ok {
-		return "", errCtx.Wrap(err).Error("Unexpected - track is not a split request")
+		return "", errctx.Wrap(err).Error("Unexpected - track is not a split request")
 	}
 
 	destinationURL := t.generatePath(tracklistID, trackID)
 
 	err = t.youtubedler.Download(splitStemTrack.OriginalURL, destinationURL)
 	if err != nil {
-		return "", errCtx.Field("destination_url", destinationURL).
+		return "", errctx.Field("destination_url", destinationURL).
 			Wrap(err).Error("Failed to download track to cloud")
 	}
 

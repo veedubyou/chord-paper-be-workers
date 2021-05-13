@@ -61,16 +61,16 @@ func (d JobHandler) HandleMessage(message []byte) error {
 		return cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
 
-	errCtx := cerr.Field("params", params)
+	errctx := cerr.Field("params", params)
 
 	savedOriginalURL, err := d.trackDownloader.Download(params.TrackListID, params.TrackID)
 	if err != nil {
-		return errCtx.Wrap(err).Error("Failed to download track")
+		return errctx.Wrap(err).Error("Failed to download track")
 	}
 
 	err = d.publishSplitTrackMessage(savedOriginalURL, params.TrackListID, params.TrackID)
 	if err != nil {
-		return errCtx.Field("saved_original_url", savedOriginalURL).
+		return errctx.Field("saved_original_url", savedOriginalURL).
 			Wrap(err).Error("Failed to publish the next job message")
 	}
 
@@ -101,14 +101,14 @@ func unmarshalMessage(message []byte) (JobParams, error) {
 		return JobParams{}, cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
 
-	errCtx := cerr.Field("job_params", params)
+	errctx := cerr.Field("job_params", params)
 
 	if params.TrackListID == "" {
-		return JobParams{}, errCtx.Wrap(err).Error("Missing tracklist ID")
+		return JobParams{}, errctx.Wrap(err).Error("Missing tracklist ID")
 	}
 
 	if params.TrackID == "" {
-		return JobParams{}, errCtx.Wrap(err).Error("Missing track ID")
+		return JobParams{}, errctx.Wrap(err).Error("Missing track ID")
 	}
 
 	return params, nil

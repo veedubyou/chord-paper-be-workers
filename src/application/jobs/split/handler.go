@@ -65,16 +65,16 @@ func (s JobHandler) HandleMessage(message []byte) error {
 		return cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
 
-	errCtx := cerr.Field("job_params", params)
+	errctx := cerr.Field("job_params", params)
 
 	stemURLs, err := s.splitter.SplitTrack(context.Background(), params.TrackListID, params.TrackID, params.SavedOriginalURL)
 	if err != nil {
-		return errCtx.Wrap(err).Error("Failed to split the track")
+		return errctx.Wrap(err).Error("Failed to split the track")
 	}
 
 	err = s.publishSaveDBMessage(params.TrackListID, params.TrackID, stemURLs)
 	if err != nil {
-		return errCtx.Field("stem_urls", stemURLs).
+		return errctx.Field("stem_urls", stemURLs).
 			Wrap(err).Error("Failed to publish the next job message")
 	}
 

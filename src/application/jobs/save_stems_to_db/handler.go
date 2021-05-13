@@ -64,21 +64,21 @@ func (s JobHandler) HandleMessage(message []byte) error {
 		return cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
 
-	errCtx := cerr.Field("job_params", params)
+	errctx := cerr.Field("job_params", params)
 
 	track, err := s.trackStore.GetTrack(context.Background(), params.TrackListID, params.TrackID)
 	if err != nil {
-		return errCtx.Wrap(err).Error("Failed to get track")
+		return errctx.Wrap(err).Error("Failed to get track")
 	}
 
 	splitStemTrack, ok := track.(entity.SplitStemTrack)
 	if !ok {
-		return errCtx.Error("Unexpected - track is not a split request")
+		return errctx.Error("Unexpected - track is not a split request")
 	}
 
 	newTrackType, ok := postSplitTrackType[splitStemTrack.TrackType]
 	if !ok {
-		return errCtx.Field("track", splitStemTrack).
+		return errctx.Field("track", splitStemTrack).
 			Error("No matching entry for setting the new track type")
 	}
 
@@ -91,7 +91,7 @@ func (s JobHandler) HandleMessage(message []byte) error {
 
 	err = s.trackStore.SetTrack(context.Background(), params.TrackListID, params.TrackID, newTrack)
 	if err != nil {
-		return errCtx.Field("new_track", newTrack).
+		return errctx.Field("new_track", newTrack).
 			Wrap(err).Error("Failed to write new track")
 	}
 
@@ -105,18 +105,18 @@ func unmarshalMessage(message []byte) (JobParams, error) {
 		return JobParams{}, cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
 
-	errCtx := cerr.Field("job_params", params)
+	errctx := cerr.Field("job_params", params)
 
 	if params.TrackListID == "" {
-		return JobParams{}, errCtx.Error("Missing tracklist ID")
+		return JobParams{}, errctx.Error("Missing tracklist ID")
 	}
 
 	if params.TrackID == "" {
-		return JobParams{}, errCtx.Error("Missing track ID")
+		return JobParams{}, errctx.Error("Missing track ID")
 	}
 
 	if len(params.StemURLS) == 0 {
-		return JobParams{}, errCtx.Error("Missing stem URLS")
+		return JobParams{}, errctx.Error("Missing stem URLS")
 	}
 
 	return params, nil

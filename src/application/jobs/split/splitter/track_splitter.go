@@ -29,7 +29,7 @@ func NewTrackSplitter(splitter FileSplitter, trackStore entity.TrackStore, bucke
 }
 
 func (t TrackSplitter) SplitTrack(ctx context.Context, tracklistID string, trackID string, savedOriginalURL string) (StemFilePaths, error) {
-	errCtx := cerr.Fields(cerr.F{
+	errctx := cerr.Fields(cerr.F{
 		"tracklist_id":       tracklistID,
 		"track_id":           trackID,
 		"saved_original_url": savedOriginalURL,
@@ -37,24 +37,24 @@ func (t TrackSplitter) SplitTrack(ctx context.Context, tracklistID string, track
 
 	track, err := t.trackStore.GetTrack(ctx, tracklistID, trackID)
 	if err != nil {
-		return nil, errCtx.Wrap(err).Error("Failed to get track from track store")
+		return nil, errctx.Wrap(err).Error("Failed to get track from track store")
 	}
 
 	splitStemTrack, ok := track.(entity.SplitStemTrack)
 	if !ok {
-		return nil, errCtx.Error("Unexpected: track is not a split request")
+		return nil, errctx.Error("Unexpected: track is not a split request")
 	}
 
-	errCtx = errCtx.Field("track", splitStemTrack)
+	errctx = errctx.Field("track", splitStemTrack)
 
 	splitType, err := ConvertToSplitType(splitStemTrack.TrackType)
 	if err != nil {
-		return nil, errCtx.Wrap(err).Error("Failed to recognize track type as split type")
+		return nil, errctx.Wrap(err).Error("Failed to recognize track type as split type")
 	}
 
 	destPath, err := t.generatePath(tracklistID, trackID, splitType)
 	if err != nil {
-		return nil, errCtx.Field("split_type", splitType).
+		return nil, errctx.Field("split_type", splitType).
 			Wrap(err).Error("Failed to generate a destination path for stem tracks")
 	}
 
