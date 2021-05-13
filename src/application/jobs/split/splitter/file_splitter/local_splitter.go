@@ -3,6 +3,7 @@ package file_splitter
 import (
 	"chord-paper-be-workers/src/application/executor"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
+	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/werror"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
@@ -25,7 +26,7 @@ var paramMap = map[splitter.SplitType]string{
 func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string, executor executor.Executor) (LocalFileSplitter, error) {
 	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
-		return LocalFileSplitter{}, werror.WrapError("Failed to convert working dir to absolute format", err)
+		return LocalFileSplitter{}, cerr.Wrap(err).Error("Failed to convert working dir to absolute format")
 	}
 	return LocalFileSplitter{
 		workingDir:      workingDir,

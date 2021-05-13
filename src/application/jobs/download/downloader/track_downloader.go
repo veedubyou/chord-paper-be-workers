@@ -3,7 +3,7 @@ package downloader
 import (
 	"chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/tracks/entity"
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 	"context"
 	"fmt"
 )
@@ -23,20 +23,23 @@ type TrackDownloader struct {
 }
 
 func (t TrackDownloader) Download(tracklistID string, trackID string) (string, error) {
+	errCtx := cerr.Field("tracklist_id", tracklistID).Field("track_id", trackID)
 	track, err := t.trackStore.GetTrack(context.Background(), tracklistID, trackID)
 	if err != nil {
-		return "", werror.WrapError("Failed to GetTrack ", err)
+		return "", errCtx.Wrap(err).Error("Failed to GetTrack")
 	}
 
 	splitStemTrack, ok := track.(entity.SplitStemTrack)
 	if !ok {
-		return "", werror.WrapError("Unexpected - track is not a split request", nil)
+		return "", errCtx.Wrap(err).Error("Unexpected - track is not a split request")
 	}
 
 	destinationURL := t.generatePath(tracklistID, trackID)
+
 	err = t.youtubedler.Download(splitStemTrack.OriginalURL, destinationURL)
 	if err != nil {
-		return "", werror.WrapError("Failed to download track to cloud", err)
+		return "", errCtx.Field("destination_url", destinationURL).
+			Wrap(err).Error("Failed to download track to cloud")
 	}
 
 	return destinationURL, nil

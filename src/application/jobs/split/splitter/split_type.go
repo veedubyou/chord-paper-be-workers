@@ -2,7 +2,7 @@ package splitter
 
 import (
 	"chord-paper-be-workers/src/application/tracks/entity"
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 )
 
 type SplitType string
@@ -23,6 +23,7 @@ func ConvertToSplitType(trackType entity.TrackType) (SplitType, error) {
 	case entity.SplitFiveStemsType:
 		return SplitFiveStemsType, nil
 	default:
-		return InvalidSplitType, werror.WrapError("Value does not match any split type", nil)
+		return InvalidSplitType,
+			cerr.Field("track_type", trackType).Error("Value does not match any split type")
 	}
 }

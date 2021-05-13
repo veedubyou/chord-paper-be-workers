@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 
 	"github.com/apex/log"
 
@@ -31,7 +31,7 @@ func NewQueueWorkerFromConnection(conn *amqp.Connection, queueName string, messa
 	rabbitChannel, err := conn.Channel()
 	if err != nil {
 		_ = conn.Close()
-		return QueueWorker{}, werror.WrapError("Failed to get channel", err)
+		return QueueWorker{}, cerr.Wrap(err).Error("Failed to get channel")
 	}
 
 	queue, err := rabbitChannel.QueueDeclare(
@@ -45,7 +45,7 @@ func NewQueueWorkerFromConnection(conn *amqp.Connection, queueName string, messa
 
 	if err != nil {
 		_ = rabbitChannel.Close()
-		return QueueWorker{}, werror.WrapError("Failed to declare queue", err)
+		return QueueWorker{}, cerr.Wrap(err).Error("Failed to declare queue")
 	}
 
 	return NewQueueWorker(rabbitChannel, queue.Name, messageHandlers), nil
@@ -67,7 +67,8 @@ func (q *QueueWorker) Start() error {
 	)
 
 	if err != nil {
-		return werror.WrapError("Failed to start consuming from channel", err)
+		return cerr.Field("queue_name", q.queueName).
+			Wrap(err).Error("Failed to start consuming from channel")
 	}
 
 	for message := range messageStream {
@@ -75,7 +76,11 @@ func (q *QueueWorker) Start() error {
 		logger.Info("Handling message")
 		err := q.handleMessage(message)
 		if err != nil {
-			logger.WithField("err", err).Error("Failed to process messages")
+			err = cerr.Field("message_type", message.Body).
+				Wrap(err).Error("Failed to process message")
+
+			cerr.Log(err)
+
 			if err = message.Nack(false, true); err != nil {
 				logger.Error("Failed to nack message")
 			}
@@ -97,5 +102,5 @@ func (q *QueueWorker) handleMessage(message amqp.Delivery) error {
 		}
 	}
 
-	return werror.WrapError("No appropriate message handler found", nil)
+	return cerr.Error("No appropriate message handler found")
 }
