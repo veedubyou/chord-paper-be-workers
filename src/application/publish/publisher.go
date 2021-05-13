@@ -1,7 +1,7 @@
 package publish
 
 import (
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 
 	"github.com/streadway/amqp"
 )
@@ -18,7 +18,7 @@ type Publisher interface {
 func NewRabbitMQPublisher(conn *amqp.Connection, queueName string) (RabbitMQPublisher, error) {
 	channel, err := conn.Channel()
 	if err != nil {
-		return RabbitMQPublisher{}, werror.WrapError("Failed to create rabbit channel", err)
+		return RabbitMQPublisher{}, cerr.Wrap(err).Error("Failed to create rabbit channel")
 	}
 
 	return RabbitMQPublisher{

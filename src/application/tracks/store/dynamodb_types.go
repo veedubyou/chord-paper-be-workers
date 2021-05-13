@@ -1,7 +1,7 @@
 package store
 
 import (
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -9,11 +9,11 @@ import (
 func getStringField(object map[string]*dynamodb.AttributeValue, fieldKey string) (string, error) {
 	stringVal, ok := object[fieldKey]
 	if !ok {
-		return "", werror.WrapError("Missing string key on object", nil)
+		return "", cerr.Error("Missing string key on object")
 	}
 
 	if stringVal.S == nil {
-		return "", werror.WrapError("String value is empty", nil)
+		return "", cerr.Error("String value is empty")
 	}
 
 	return *stringVal.S, nil

@@ -3,7 +3,7 @@ package downloader
 import (
 	"chord-paper-be-workers/src/application/cloud_storage/entity"
 	"chord-paper-be-workers/src/application/executor"
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
 	"io/ioutil"
@@ -16,7 +16,7 @@ import (
 func NewYoutubeDLer(youtubedlBinPath string, workingDirStr string, fileStore entity.FileStore, commandExecutor executor.Executor) (YoutubeDLer, error) {
 	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
-		return YoutubeDLer{}, werror.WrapError("Failed to create working dir", err)
+		return YoutubeDLer{}, cerr.Field("working_dir_str", workingDirStr).Wrap(err).Error("Failed to create working dir")
 	}
 
 	return YoutubeDLer{
@@ -35,41 +35,45 @@ type YoutubeDLer struct {
 }
 
 func (y YoutubeDLer) Download(sourceURL string, destinationURL string) error {
+	errctx := cerr.Field("source_url", sourceURL).Field("destination_url", destinationURL)
+
 	log.Info("Creating temp dir to store youtube DL file temporarily")
 	tempDir, err := ioutil.TempDir(y.workingDir.TempDir(), "youtubedl-*")
 	if err != nil {
-		return werror.WrapError("Failed to create temp dir to download to", err)
+		return errctx.Field("temp_dir", y.workingDir.TempDir()).
+			Wrap(err).Error("Failed to create temp dir to download to")
 	}
 	defer os.RemoveAll(tempDir)
 
 	tempDir, err = filepath.Abs(tempDir)
 	if err != nil {
-		return werror.WrapError("Failed to turn temp dir into absolute format", err)
+		return errctx.Field("temp_dir", tempDir).
+			Wrap(err).Error("Failed to turn temp dir into absolute format")
 	}
 
 	outputPath := filepath.Join(tempDir, "original.mp3")
+	errctx = errctx.Field("output_path", outputPath)
 
 	log.Info("Running youtube-dl")
 
 	cmd := y.commandExecutor.Command(y.youtubedlBinPath, "-o", outputPath, "-x", "--audio-format", "mp3", "--audio-quality", "0", sourceURL)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error(string(output))
-		return werror.WrapError("Failed to run youtube-dl", err)
+		return errctx.Field("error_msg", string(output)).
+			Wrap(err).Error("Failed to run youtube-dl")
 	}
-
-	log.Debug(string(output))
 
 	log.Info("Reading output file to memory")
 	fileContent, err := os.ReadFile(outputPath)
 	if err != nil {
-		return werror.WrapError("Failed to read outputed youtubedl mp3", err)
+		return errctx.Field("error_msg", string(output)).
+			Wrap(err).Error("Failed to read outputed youtubedl mp3")
 	}
 
 	log.Info("Writing file to remote file store")
 	err = y.fileStore.WriteFile(context.Background(), destinationURL, fileContent)
 	if err != nil {
-		return werror.WrapError("Failed to write file to the cloud", err)
+		return errctx.Wrap(err).Error("Failed to write file to the cloud")
 	}
 
 	return nil

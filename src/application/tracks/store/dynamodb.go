@@ -2,8 +2,8 @@ package store
 
 import (
 	"chord-paper-be-workers/src/application/tracks/entity"
+	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/env"
-	"chord-paper-be-workers/src/lib/werror"
 	"context"
 	"fmt"
 
@@ -59,12 +59,12 @@ func (d DynamoDBTrackStore) GetTrack(_ context.Context, tracklistID string, trac
 	})
 
 	if err != nil {
-		return entity.BaseTrack{}, werror.WrapError("Failed to get TrackList from DynamoDB", err)
+		return entity.BaseTrack{}, cerr.Wrap(err).Error("Failed to get TrackList from DynamoDB")
 	}
 
 	track, err := trackFromDynamoTrackList(trackID, output.Item)
 	if err != nil {
-		return entity.BaseTrack{}, werror.WrapError("Failed to extract track from output items", err)
+		return entity.BaseTrack{}, cerr.Wrap(err).Error("Failed to extract track from output items")
 	}
 
 	return track, nil
@@ -73,17 +73,17 @@ func (d DynamoDBTrackStore) GetTrack(_ context.Context, tracklistID string, trac
 func trackFromDynamoTrackList(targetTrackID string, tracklist map[string]*dynamodb.AttributeValue) (entity.Track, error) {
 	tracks, ok := tracklist["tracks"]
 	if !ok || tracks.L == nil {
-		return entity.BaseTrack{}, werror.WrapError("Missing tracks field", nil)
+		return entity.BaseTrack{}, cerr.Error("Missing tracks field")
 	}
 
 	for _, trackItem := range tracks.L {
 		if trackItem.M == nil {
-			return entity.BaseTrack{}, werror.WrapError("Track is not an object", nil)
+			return entity.BaseTrack{}, cerr.Error("Track is not an object")
 		}
 
 		trackID, err := getStringField(trackItem.M, "id")
 		if err != nil {
-			return entity.BaseTrack{}, werror.WrapError("Failed to get string field", err)
+			return entity.BaseTrack{}, cerr.Wrap(err).Error("Failed to get string field")
 		}
 
 		if trackID == targetTrackID {
@@ -91,13 +91,13 @@ func trackFromDynamoTrackList(targetTrackID string, tracklist map[string]*dynamo
 		}
 	}
 
-	return entity.BaseTrack{}, werror.WrapError("No matching track IDs found", nil)
+	return entity.BaseTrack{}, cerr.Error("No matching track IDs found")
 }
 
 func trackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (entity.Track, error) {
 	trackType, err := getStringField(track, "track_type")
 	if err != nil {
-		return entity.BaseTrack{}, werror.WrapError("Failed to get track type", err)
+		return entity.BaseTrack{}, cerr.Wrap(err).Error("Failed to get track type")
 	}
 
 	switch trackType {
@@ -106,7 +106,7 @@ func trackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (entity.Tra
 		string(entity.FourStemsType),
 		string(entity.FiveStemsType):
 		{
-			return entity.BaseTrack{}, werror.WrapError("Not implemented at the moment", nil)
+			return entity.BaseTrack{}, cerr.Error("Not implemented at the moment")
 		}
 	case
 		string(entity.SplitTwoStemsType),
@@ -117,7 +117,7 @@ func trackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (entity.Tra
 		}
 	default:
 		{
-			return entity.BaseTrack{}, werror.WrapError("Unknown track type found", nil)
+			return entity.BaseTrack{}, cerr.Error("Unknown track type found")
 		}
 	}
 }
@@ -125,17 +125,17 @@ func trackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (entity.Tra
 func splitStemTrackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (entity.SplitStemTrack, error) {
 	trackTypeVal, err := getStringField(track, "track_type")
 	if err != nil {
-		return entity.SplitStemTrack{}, werror.WrapError("Failed to get track type", err)
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get track type")
 	}
 
 	trackType, err := entity.ConvertToTrackType(trackTypeVal)
 	if err != nil {
-		return entity.SplitStemTrack{}, werror.WrapError("Failed to convert track type string value to enum", err)
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to convert track type string value to enum")
 	}
 
 	originalURL, err := getStringField(track, "original_url")
 	if err != nil {
-		return entity.SplitStemTrack{}, werror.WrapError("Failed to get original URL", err)
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get original URL")
 	}
 
 	return entity.SplitStemTrack{
@@ -149,7 +149,7 @@ func splitStemTrackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (e
 func (d DynamoDBTrackStore) SetTrack(_ context.Context, trackListID string, trackID string, track entity.Track) error {
 	stemTrack, ok := track.(entity.StemTrack)
 	if !ok {
-		return werror.WrapError("Can only write stem tracks at this time", nil)
+		return cerr.Error("Can only write stem tracks at this time")
 	}
 
 	var err error
@@ -201,7 +201,7 @@ func (d DynamoDBTrackStore) updateTrack(index int, trackListID string, trackID s
 		UpdateExpression:          &updateExpression,
 	})
 	if err != nil {
-		return werror.WrapError("Failed to update dynamoDB item", err)
+		return cerr.Wrap(err).Error("Failed to update dynamoDB item")
 	}
 
 	return nil

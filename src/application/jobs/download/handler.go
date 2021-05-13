@@ -5,7 +5,7 @@ import (
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/publish"
 	"chord-paper-be-workers/src/application/worker"
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 	"encoding/json"
 
 	"github.com/apex/log"
@@ -23,7 +23,7 @@ func CreateJobMessage(tracklistID string, trackID string) (amqp.Publishing, erro
 
 	jsonBytes, err := json.Marshal(params)
 	if err != nil {
-		return amqp.Publishing{}, werror.WrapError("Failed to marshal job params", err)
+		return amqp.Publishing{}, cerr.Wrap(err).Error("Failed to marshal job params")
 	}
 
 	return amqp.Publishing{
@@ -58,17 +58,20 @@ func (JobHandler) JobType() string {
 func (d JobHandler) HandleMessage(message []byte) error {
 	params, err := unmarshalMessage(message)
 	if err != nil {
-		return werror.WrapError("Failed to unmarshal message JSON", err)
+		return cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
+
+	errctx := cerr.Field("params", params)
 
 	savedOriginalURL, err := d.trackDownloader.Download(params.TrackListID, params.TrackID)
 	if err != nil {
-		return werror.WrapError("Failed to download track", err)
+		return errctx.Wrap(err).Error("Failed to download track")
 	}
 
 	err = d.publishSplitTrackMessage(savedOriginalURL, params.TrackListID, params.TrackID)
 	if err != nil {
-		return werror.WrapError("Failed to publish the next job message", err)
+		return errctx.Field("saved_original_url", savedOriginalURL).
+			Wrap(err).Error("Failed to publish the next job message")
 	}
 
 	return nil
@@ -78,13 +81,14 @@ func (d JobHandler) publishSplitTrackMessage(savedOriginalURL string, trackListI
 	log.Info("Creating split track job message")
 	job, err := split.CreateJobMessage(savedOriginalURL, trackListID, trackID)
 	if err != nil {
-		return werror.WrapError("Failed to create split job params", err)
+		return cerr.Wrap(err).Error("Failed to create split job params")
 	}
 
 	log.Info("Publishing split track job message")
 	err = d.publisher.Publish(job)
 	if err != nil {
-		return werror.WrapError("Failed to publish next job message", err)
+		return cerr.Field("next_job", job).
+			Wrap(err).Error("Failed to publish next job message")
 	}
 
 	return nil
@@ -94,15 +98,17 @@ func unmarshalMessage(message []byte) (JobParams, error) {
 	params := JobParams{}
 	err := json.Unmarshal(message, &params)
 	if err != nil {
-		return JobParams{}, werror.WrapError("Failed to unmarshal message JSON", err)
+		return JobParams{}, cerr.Wrap(err).Error("Failed to unmarshal message JSON")
 	}
 
+	errctx := cerr.Field("job_params", params)
+
 	if params.TrackListID == "" {
-		return JobParams{}, werror.WrapError("Missing tracklist ID", err)
+		return JobParams{}, errctx.Wrap(err).Error("Missing tracklist ID")
 	}
 
 	if params.TrackID == "" {
-		return JobParams{}, werror.WrapError("Missing track ID", err)
+		return JobParams{}, errctx.Wrap(err).Error("Missing track ID")
 	}
 
 	return params, nil

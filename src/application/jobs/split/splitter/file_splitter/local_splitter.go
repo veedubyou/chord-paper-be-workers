@@ -3,10 +3,9 @@ package file_splitter
 import (
 	"chord-paper-be-workers/src/application/executor"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
-	"chord-paper-be-workers/src/lib/werror"
+	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,7 @@ var paramMap = map[splitter.SplitType]string{
 func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string, executor executor.Executor) (LocalFileSplitter, error) {
 	workingDir, err := working_dir.NewWorkingDir(workingDirStr)
 	if err != nil {
-		return LocalFileSplitter{}, werror.WrapError("Failed to convert working dir to absolute format", err)
+		return LocalFileSplitter{}, cerr.Wrap(err).Error("Failed to convert working dir to absolute format")
 	}
 	return LocalFileSplitter{
 		workingDir:      workingDir,
@@ -43,21 +42,24 @@ type LocalFileSplitter struct {
 func (l LocalFileSplitter) SplitFile(ctx context.Context, originalTrackFilePath string, stemsOutputDir string, splitType splitter.SplitType) (splitter.StemFilePaths, error) {
 	absOriginalTrackFilePath, err := filepath.Abs(originalTrackFilePath)
 	if err != nil {
-		return nil, werror.WrapError("Cannot convert source path to absolute format", err)
+		return nil, cerr.Wrap(err).Error("Cannot convert source path to absolute format")
 	}
+
+	errctx := cerr.Field("original_filepath", absOriginalTrackFilePath)
 
 	absStemsOutputDir, err := filepath.Abs(stemsOutputDir)
 	if err != nil {
-		return nil, werror.WrapError("Cannot convert destination path to absolute format", err)
+		return nil, errctx.Wrap(err).Error("Cannot convert destination path to absolute format")
 	}
 
 	// splitting is a lengthy process, if we want to halt now is the time
 	if ctx.Err() != nil {
-		return nil, werror.WrapError("Context cancelled before splitting could happen", ctx.Err())
+		return nil, cerr.Wrap(ctx.Err()).Error("Context cancelled before splitting could happen")
 	}
 
 	if err := l.runSpleeter(absOriginalTrackFilePath, absStemsOutputDir, splitType); err != nil {
-		return nil, werror.WrapError("Failed to execute spleeter", err)
+		return nil, cerr.Field("output_dir", absStemsOutputDir).
+			Wrap(err).Error("Failed to execute spleeter")
 	}
 
 	return collectStemFilePaths(absStemsOutputDir)
@@ -73,7 +75,7 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 
 	splitParam, ok := paramMap[splitType]
 	if !ok {
-		return werror.WrapError("Invalid split type passed in!", nil)
+		return cerr.Error("Invalid split type passed in!")
 	}
 
 	logger.Info("Running spleeter command")
@@ -82,8 +84,8 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		errMsg := fmt.Sprintf("Error occurred while running spleeter - output: %s", string(output))
-		return werror.WrapError(errMsg, err)
+		return cerr.Field("spleeter_output", string(output)).
+			Wrap(err).Error("Error occurred while running spleeter")
 	}
 
 	logger.Debug(string(output))
@@ -100,11 +102,11 @@ func collectStemFilePaths(dir string) (splitter.StemFilePaths, error) {
 	logger.Info("Reading directory to collect file paths")
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, werror.WrapError("Error reading output directory", err)
+		return nil, cerr.Wrap(err).Error("Error reading output directory")
 	}
 
 	if len(dirEntries) == 0 {
-		return nil, werror.WrapError("No files in output directory", nil)
+		return nil, cerr.Error("No files in output directory")
 	}
 
 	outputs := splitter.StemFilePaths{}
@@ -115,9 +117,11 @@ func collectStemFilePaths(dir string) (splitter.StemFilePaths, error) {
 		}
 
 		fileName := dirEntry.Name()
-		filePath, err := filepath.Abs(filepath.Join(dir, fileName))
+		relFilePath := filepath.Join(dir, fileName)
+		filePath, err := filepath.Abs(relFilePath)
 		if err != nil {
-			return nil, werror.WrapError("Failed to convert file path to absolute format", err)
+			return nil, cerr.Field("relative_file_path", relFilePath).
+				Wrap(err).Error("Failed to convert file path to absolute format")
 		}
 
 		stemName := strings.TrimSuffix(fileName, filepath.Ext(fileName))

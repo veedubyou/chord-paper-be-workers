@@ -1,6 +1,6 @@
 package entity
 
-import "chord-paper-be-workers/src/lib/werror"
+import "chord-paper-be-workers/src/lib/cerr"
 
 type TrackType string
 
@@ -31,7 +31,7 @@ func ConvertToTrackType(val string) (TrackType, error) {
 	case SplitFiveStemsType:
 		return SplitFiveStemsType, nil
 	default:
-		return InvalidType, werror.WrapError("Value does not match any track type", nil)
+		return InvalidType, cerr.Field("track_type", val).Error("Value does not match any track type")
 	}
 }
 
