@@ -79,13 +79,17 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 	}
 
 	logger.Info("Running spleeter command")
-	cmd := l.executor.Command(l.spleeterBinPath, "separate", "-i", sourcePath, "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3")
+
+	args := []string{"separate", "-i", sourcePath, "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3"}
+
+	errctx := cerr.Field("spleeter_bin_path", l.spleeterBinPath).Field("spleeter_args", args)
+
+	cmd := l.executor.Command(l.spleeterBinPath, args...)
 	cmd.SetDir(l.workingDir.Root())
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Info(string(output))
-		return cerr.Field("spleeter_output", string(output)).
+		return errctx.Field("spleeter_output", string(output)).
 			Wrap(err).Error("Error occurred while running spleeter")
 	}
 
