@@ -76,7 +76,7 @@ func (q *QueueWorker) Start() error {
 		logger.Info("Handling message")
 		err := q.handleMessage(message)
 		if err != nil {
-			err = cerr.Field("message_type", message.Body).
+			err = cerr.Field("message_type", message.Type).
 				Wrap(err).Error("Failed to process message")
 
 			cerr.Log(err)
