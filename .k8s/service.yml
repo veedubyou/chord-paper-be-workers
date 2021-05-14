@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-hooks-svc
+  name: chord-be-workers-svc
 spec:
   selector:
-    app: test-hooks
+    app: chord-be-workers
   ports:
     - protocol: TCP
       port: 80
       targetPort: 80
-      nodePort: 31000
+      nodePort: 32500
   type: NodePort
 #  type: ClusterIP
 
