@@ -1,0 +1,83 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - master
+
+#env:
+#  GKE_PROJECT: ${{ secrets.GKE_PROJECT }}
+#  GKE_ZONE: us-west1-a
+#  GKE_CLUSTER: cluster-1
+  
+    
+jobs:
+  push:
+    #runs-on: ubuntu-latest
+    runs-on: chord-paper-be-worker-runner
+    steps:
+      # Checkout with history (to get git describe output properly)
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # Run script, updates the GIT-VERSION-FILE with version number
+      - name: Update GIT-VERSION-FILE
+        run: bash git-version.sh
+      - name: Get version tag from GIT-VERSION-FILE
+        run: echo "gitver=$(cat GIT-VERSION-FILE)" >> $GITHUB_ENV
+      - name: Login to DockerHub
+        run: echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+      # base image
+
+      - name: Build image w/version
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
+      - name: Build image latest
+        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:latest
+      - name: Push image w/version
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
+      - name: Push image latest
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:latest
+
+      # youtube-dl
+
+      - name: Build youtube-dl image w/version
+        run: docker build --no-cache ./youtube-dl --tag ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:${{ env.gitver }}
+      - name: Build youtube-dl image latest
+        run: docker build --no-cache ./youtube-dl --tag ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:latest
+      - name: Push youtube-dl image w/version
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:${{ env.gitver }}
+      - name: Push youtube-dl image latest
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:latest
+
+      - name: Deploy Project to K8S Cluster
+        uses: steebchen/kubectl@master
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+        with:
+          args: set image --record deploy/chord-be-workers chord-be-workers=${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
+     
+      - name: Verify K8S Deployment
+        uses: steebchen/kubectl@master
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+#          KUBECTL_VERSION: "1.19"
+        with:
+          args: rollout status deploy/chord-be-workers
+          
+      #- name: Setup GCloud CLI
+      #  uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+      #  with:
+      #    version: '270.0.0'
+      #    service_account_email: ${{ secrets.GKE_EMAIL }}
+      #    service_account_key: ${{ secrets.GKE_KEY }}
+
+      #- name: Deploy to GKE
+      #  continue-on-error: true
+      #  timeout-minutes: 2
+      #  run: |
+      #    gcloud container clusters get-credentials $GKE_CLUSTER --zone $GKE_ZONE --project $GKE_PROJECT
+      #    kubectl rollout restart deploy/chord-fe
+      #    kubectl rollout status deploy/chord-fe
+      #    kubectl get services -o wide
