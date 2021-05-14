@@ -20,8 +20,6 @@ COPY go.mod go.sum ./
 COPY pkg/ ./pkg/
 COPY src/ ./src/
 
-WORKDIR /chord-paper-be-workers/src
-
 RUN go build -o chord-paper-be-workers ./src/main.go
  
 #CMD exec /bin/sh -c "trap : TERM INT; sleep 9999999999d & wait"
