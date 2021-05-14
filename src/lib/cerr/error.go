@@ -50,6 +50,10 @@ func (c ContextualError) Unwrap() error {
 	return c.Context.WrappedError
 }
 
+func (c ContextualError) Fields() map[string]interface{} {
+	return c.Context.ContextFields
+}
+
 func (c ContextualError) Error() string {
 	return c.String()
 }
