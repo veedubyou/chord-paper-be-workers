@@ -84,6 +84,7 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		logger.Info(string(output))
 		return cerr.Field("spleeter_output", string(output)).
 			Wrap(err).Error("Error occurred while running spleeter")
 	}
