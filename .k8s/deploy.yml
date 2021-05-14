@@ -19,8 +19,43 @@ spec:
       containers:
       - name: chord-be-workers
         image: pw1124/chord-be-workers:latest
-        ports:
-        - containerPort: 80
+        env:
+        - name: ENVIRONMENT
+          value: production
+        - name: SPLEETER_BIN_PATH
+          value: /usr/local/bin/spleeter
+        - name: SPLEETER_WORKING_DIR_PATH
+          value: /spleeter-scratch
+        - name: NUM_WORKERS
+          value: 5
+        - name: YOUTUBEDL_BIN_PATH
+          value: /shared/youtube-dl
+        - name: YOUTUBEDL_WORKING_DIR_PATH
+          value: /youtubedl-scratch
+        - name: GOOGLE_CLOUD_STORAGE_BUCKET_NAME
+          value: chord-paper-tracks
+        - name: RABBITMQ_QUEUE_NAME
+          value: chord-paper-tracks
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-dynamodb
+              key: access_key_id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-dynamodb
+              key: secret_access_key
+        - name: RABBITMQ_URL
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq
+              key: rabbitmq_url
+        - name: GOOGLE_CLOUD_KEY
+          valueFrom:
+            secretKeyRef:
+              name: google-cloud-key
+              key: key
         volumeMounts:
         - mountPath: /shared
           name: cache-volume

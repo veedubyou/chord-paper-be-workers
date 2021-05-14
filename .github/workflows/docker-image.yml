@@ -14,7 +14,7 @@ on:
 jobs:
   push:
     #runs-on: ubuntu-latest
-    runs-on: chord-paper-be-worker-runner
+    runs-on: chord-paper-be-workers-runner
     steps:
       # Checkout with history (to get git describe output properly)
       - name: Checkout
