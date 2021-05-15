@@ -81,7 +81,7 @@ func (q *QueueWorker) Start() error {
 
 			cerr.Log(err)
 
-			if err = message.Nack(false, true); err != nil {
+			if err = message.Nack(false, false); err != nil {
 				logger.Error("Failed to nack message")
 			}
 		} else {
