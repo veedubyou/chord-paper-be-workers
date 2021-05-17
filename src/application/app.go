@@ -12,12 +12,10 @@ import (
 	"chord-paper-be-workers/src/application/publish"
 	trackstore "chord-paper-be-workers/src/application/tracks/store"
 	"chord-paper-be-workers/src/application/worker"
+	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/env"
 	"fmt"
 	"os"
-	"strconv"
-
-	"github.com/apex/log"
 
 	"github.com/streadway/amqp"
 )
@@ -38,7 +36,7 @@ func ensureOk(err error) {
 }
 
 type App struct {
-	workers []worker.QueueWorker
+	worker worker.QueueWorker
 }
 
 func NewApp() App {
@@ -48,33 +46,18 @@ func NewApp() App {
 	producerConn, err := amqp.Dial(rabbitURL)
 	ensureOk(err)
 
-	workers := []worker.QueueWorker{}
-	numWorkers := getNumWorkers()
-	for i := 0; i < numWorkers; i++ {
-		workers = append(workers, newWorker(consumerConn, producerConn))
-	}
-
 	return App{
-		workers: workers,
+		worker: newWorker(consumerConn, producerConn),
 	}
 }
 
-func (a *App) Start() {
-	for _, queueWorker := range a.workers {
-		go func(worker worker.QueueWorker) {
-			err := worker.Start()
-			if err != nil {
-				log.Error("Failed to start worker!")
-			}
-		}(queueWorker)
+func (a *App) Start() error {
+	err := a.worker.Start()
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to start worker")
 	}
-}
 
-func getNumWorkers() int {
-	numWorkersStr := getEnvOrPanic("NUM_WORKERS")
-	numWorkers, err := strconv.Atoi(numWorkersStr)
-	ensureOk(err)
-	return numWorkers
+	return nil
 }
 
 func newWorker(consumerConn *amqp.Connection, producerConn *amqp.Connection) worker.QueueWorker {

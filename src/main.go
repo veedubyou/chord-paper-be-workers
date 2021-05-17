@@ -6,10 +6,7 @@ import (
 
 func main() {
 	app := application.NewApp()
-	app.Start()
-	waitForever()
-}
-
-func waitForever() {
-	<-make(chan bool)
+	if err := app.Start(); err != nil {
+		panic(err)
+	}
 }

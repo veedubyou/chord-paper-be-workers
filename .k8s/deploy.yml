@@ -26,8 +26,6 @@ spec:
           value: /usr/local/bin/spleeter
         - name: SPLEETER_WORKING_DIR_PATH
           value: /spleeter-scratch
-        - name: NUM_WORKERS
-          value: "5"
         - name: YOUTUBEDL_BIN_PATH
           value: /shared/youtube-dl
         - name: YOUTUBEDL_WORKING_DIR_PATH
