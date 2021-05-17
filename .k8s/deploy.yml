@@ -5,7 +5,7 @@ metadata:
   labels:
     app: chord-be-workers
 spec:
-  replicas: 2
+  replicas: 5
   selector: 
     matchLabels:
       app: chord-be-workers
@@ -27,7 +27,7 @@ spec:
         - name: SPLEETER_WORKING_DIR_PATH
           value: /spleeter-scratch
         - name: NUM_WORKERS
-          value: 5
+          value: "5"
         - name: YOUTUBEDL_BIN_PATH
           value: /shared/youtube-dl
         - name: YOUTUBEDL_WORKING_DIR_PATH
