@@ -80,7 +80,7 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 
 	logger.Info("Running spleeter command")
 
-	args := []string{"separate", "-i", sourcePath, "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3"}
+	args := []string{"separate", "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3", sourcePath}
 
 	errctx := cerr.Field("spleeter_bin_path", l.spleeterBinPath).Field("spleeter_args", args)
 

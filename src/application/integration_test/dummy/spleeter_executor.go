@@ -47,10 +47,9 @@ func (s SpleeterCommand) CombinedOutput() ([]byte, error) {
 		return nil, UnexpectedInput
 	}
 
-	sourcePath, err := getOptionValue(s.Args, "-i")
-	if err != nil {
-		return nil, err
-	}
+	lastIndex := len(s.Args) - 1
+
+	sourcePath := s.Args[lastIndex]
 
 	splitParam, err := getOptionValue(s.Args, "-p")
 	if err != nil {
