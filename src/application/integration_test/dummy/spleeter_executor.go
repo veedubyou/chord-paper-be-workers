@@ -47,10 +47,9 @@ func (s SpleeterCommand) CombinedOutput() ([]byte, error) {
 		return nil, UnexpectedInput
 	}
 
-	sourcePath, err := getOptionValue(s.Args, "-i")
-	if err != nil {
-		return nil, err
-	}
+	lastIndex := len(s.Args) - 1
+
+	sourcePath := s.Args[lastIndex]
 
 	splitParam, err := getOptionValue(s.Args, "-p")
 	if err != nil {
@@ -74,15 +73,15 @@ func (s SpleeterCommand) CombinedOutput() ([]byte, error) {
 	stems := []string{}
 
 	switch splitParam {
-	case "spleeter:2stems-16khz":
+	case "spleeter:2stems-16kHz":
 		{
 			stems = append(stems, "vocals", "accompaniment")
 		}
-	case "spleeter:4stems-16khz":
+	case "spleeter:4stems-16kHz":
 		{
 			stems = append(stems, "vocals", "other", "bass", "drums")
 		}
-	case "spleeter:5stems-16khz":
+	case "spleeter:5stems-16kHz":
 		{
 			stems = append(stems, "vocals", "other", "piano", "bass", "drums")
 		}

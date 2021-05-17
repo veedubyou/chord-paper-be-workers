@@ -16,9 +16,9 @@ import (
 var _ splitter.FileSplitter = LocalFileSplitter{}
 
 var paramMap = map[splitter.SplitType]string{
-	splitter.SplitTwoStemsType:  "spleeter:2stems-16khz",
-	splitter.SplitFourStemsType: "spleeter:4stems-16khz",
-	splitter.SplitFiveStemsType: "spleeter:5stems-16khz",
+	splitter.SplitTwoStemsType:  "spleeter:2stems-16kHz",
+	splitter.SplitFourStemsType: "spleeter:4stems-16kHz",
+	splitter.SplitFiveStemsType: "spleeter:5stems-16kHz",
 }
 
 func NewLocalFileSplitter(workingDirStr string, spleeterBinPath string, executor executor.Executor) (LocalFileSplitter, error) {
@@ -80,7 +80,7 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 
 	logger.Info("Running spleeter command")
 
-	args := []string{"separate", "-i", sourcePath, "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3"}
+	args := []string{"separate", "-p", splitParam, "-o", destPath, "-c", "mp3", "-b", "320k", "-f", "{instrument}.mp3", sourcePath}
 
 	errctx := cerr.Field("spleeter_bin_path", l.spleeterBinPath).Field("spleeter_args", args)
 
