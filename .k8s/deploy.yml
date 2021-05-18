@@ -5,7 +5,7 @@ metadata:
   labels:
     app: chord-be-workers
 spec:
-  replicas: 5
+  replicas: 1
   selector: 
     matchLabels:
       app: chord-be-workers
@@ -66,6 +66,8 @@ spec:
           name: cache-volume
         command: ["/bin/sh"]
         args: ["-c", "mv /home/youtube-dl /youtube-dl/"]
+      nodeSelector:
+        ram: 8gb
       volumes:
       - name: cache-volume
         emptyDir: {}
