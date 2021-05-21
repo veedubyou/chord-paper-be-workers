@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chord-paper-be-workers/src/application/jobs/download"
+	"chord-paper-be-workers/src/application/jobs/transfer"
 	"os"
 
 	"github.com/streadway/amqp"
@@ -38,7 +38,7 @@ func main() {
 		panic(err)
 	}
 
-	job, err := download.CreateJobMessage("ad2fca6d-8c32-4030-86c0-8b5339347253", "440a7737-bcda-4761-ae89-d85880f4bce3")
+	job, err := transfer.CreateJobMessage("ad2fca6d-8c32-4030-86c0-8b5339347253", "440a7737-bcda-4761-ae89-d85880f4bce3")
 	if err != nil {
 		panic(err)
 	}
