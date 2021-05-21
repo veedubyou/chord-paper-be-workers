@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chord-paper-be-workers
+data:
+  environment: production
+  spleeter-bin-path: /usr/local/bin/spleeter
+  spleeter-working-dir-path: /spleeter-scratch
+  youtubedl-bin-path: /shared/youtube-dl
+  youtubedl-working-dir-path: /youtubedl-scratch
+  google-cloud-storage-bucket-name: chord-paper-tracks
+  rabbitmq-queue-name: chord-paper-tracks
