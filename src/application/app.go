@@ -3,12 +3,12 @@ package application
 import (
 	filestore "chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/executor"
-	"chord-paper-be-workers/src/application/jobs/download"
-	"chord-paper-be-workers/src/application/jobs/download/downloader"
 	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/application/jobs/split/splitter/file_splitter"
+	"chord-paper-be-workers/src/application/jobs/transfer"
+	"chord-paper-be-workers/src/application/jobs/transfer/download"
 	"chord-paper-be-workers/src/application/publish"
 	trackstore "chord-paper-be-workers/src/application/tracks/store"
 	"chord-paper-be-workers/src/application/worker"
@@ -92,20 +92,23 @@ func newGoogleFileStore() filestore.GoogleFileStore {
 	return fileStore
 }
 
-func newDownloadJobHandler(publisher publish.Publisher) download.JobHandler {
+func newDownloadJobHandler(publisher publish.Publisher) transfer.JobHandler {
 	youtubeDLBinPath := getEnvOrPanic("YOUTUBEDL_BIN_PATH")
 	workingDir := getEnvOrPanic("YOUTUBEDL_WORKING_DIR_PATH")
 	err := os.MkdirAll(workingDir, os.ModePerm)
 	ensureOk(err)
 
-	dler, err := downloader.NewYoutubeDLer(youtubeDLBinPath, workingDir, newGoogleFileStore(), executor.BinaryFileExecutor{})
-	ensureOk(err)
+	youtubedler := download.NewYoutubeDLer(youtubeDLBinPath, executor.BinaryFileExecutor{})
+	genericdler := download.NewGenericDLer()
+
+	selectdler := download.NewSelectDLer(youtubedler, genericdler)
 
 	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
 	bucketName := getEnvOrPanic("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
-	trackDownloader := downloader.NewTrackDownloader(dler, trackStore, bucketName)
+	trackDownloader, err := transfer.NewTrackTransferrer(selectdler, trackStore, newGoogleFileStore(), bucketName, workingDir)
+	ensureOk(err)
 
-	return download.NewJobHandler(trackDownloader, publisher)
+	return transfer.NewJobHandler(trackDownloader, publisher)
 }
 
 func newSplitJobHandler(publisher publish.Publisher) split.JobHandler {

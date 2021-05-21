@@ -1,7 +1,6 @@
-package download
+package transfer
 
 import (
-	"chord-paper-be-workers/src/application/jobs/download/downloader"
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/publish"
 	"chord-paper-be-workers/src/application/worker"
@@ -32,14 +31,14 @@ func CreateJobMessage(tracklistID string, trackID string) (amqp.Publishing, erro
 	}, nil
 }
 
-const JobType string = "download_original"
+const JobType string = "transfer_original"
 
 type JobParams struct {
 	TrackListID string `json:"tracklist_id"`
 	TrackID     string `json:"track_id"`
 }
 
-func NewJobHandler(downloader downloader.TrackDownloader, publisher publish.Publisher) JobHandler {
+func NewJobHandler(downloader TrackTransferrer, publisher publish.Publisher) JobHandler {
 	return JobHandler{
 		trackDownloader: downloader,
 		publisher:       publisher,
@@ -47,7 +46,7 @@ func NewJobHandler(downloader downloader.TrackDownloader, publisher publish.Publ
 }
 
 type JobHandler struct {
-	trackDownloader downloader.TrackDownloader
+	trackDownloader TrackTransferrer
 	publisher       publish.Publisher
 }
 

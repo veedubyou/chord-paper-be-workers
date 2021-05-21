@@ -1,4 +1,4 @@
-package download_test
+package transfer_test
 
 import (
 	"os"

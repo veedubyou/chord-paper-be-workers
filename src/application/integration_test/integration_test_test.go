@@ -3,12 +3,12 @@ package integration_test_test
 import (
 	"bytes"
 	"chord-paper-be-workers/src/application/integration_test/dummy"
-	"chord-paper-be-workers/src/application/jobs/download"
-	"chord-paper-be-workers/src/application/jobs/download/downloader"
 	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/application/jobs/split/splitter/file_splitter"
+	"chord-paper-be-workers/src/application/jobs/transfer"
+	"chord-paper-be-workers/src/application/jobs/transfer/download"
 	"chord-paper-be-workers/src/application/tracks/entity"
 	"chord-paper-be-workers/src/application/worker"
 	"context"
@@ -71,10 +71,14 @@ var _ = Describe("IntegrationTest", func() {
 		handlers := []worker.MessageHandler{}
 
 		By("Creating the download job handler", func() {
-			youtubedler, err := downloader.NewYoutubeDLer("/whatever/youtube-dl", workingDir, fileStore, youtubeDLExecutor)
+			youtubedler := download.NewYoutubeDLer("/whatever/youtube-dl", youtubeDLExecutor)
+			genericdler := download.NewGenericDLer()
+			selectdler := download.NewSelectDLer(youtubedler, genericdler)
+
+			trackDownloader, err := transfer.NewTrackTransferrer(selectdler, trackStore, fileStore, bucketName, workingDir)
 			Expect(err).NotTo(HaveOccurred())
-			trackDownloader := downloader.NewTrackDownloader(youtubedler, trackStore, bucketName)
-			handler := download.NewJobHandler(trackDownloader, rabbitMQ)
+
+			handler := transfer.NewJobHandler(trackDownloader, rabbitMQ)
 			handlers = append(handlers, handler)
 		})
 
@@ -104,7 +108,7 @@ var _ = Describe("IntegrationTest", func() {
 					Expect(err).NotTo(HaveOccurred())
 				}()
 
-				message, err := download.CreateJobMessage(tracklistID, trackID)
+				message, err := transfer.CreateJobMessage(tracklistID, trackID)
 				Expect(err).NotTo(HaveOccurred())
 				err = rabbitMQ.Publish(message)
 				Expect(err).NotTo(HaveOccurred())

@@ -1,15 +1,15 @@
-package download_test
+package transfer_test
 
 import (
 	"chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/integration_test/dummy"
 	"chord-paper-be-workers/src/application/jobs/split"
+	"chord-paper-be-workers/src/application/jobs/transfer"
 	"chord-paper-be-workers/src/application/tracks/entity"
 	"context"
 	"fmt"
 
-	"chord-paper-be-workers/src/application/jobs/download"
-	"chord-paper-be-workers/src/application/jobs/download/downloader"
+	"chord-paper-be-workers/src/application/jobs/transfer/download"
 	"chord-paper-be-workers/src/application/publish/publishfakes"
 	"encoding/json"
 
@@ -28,7 +28,7 @@ var _ = Describe("Download Job Handler", func() {
 		dummyExecutor   *dummy.YoutubeDLExecutor
 		fakePublisher   *publishfakes.FakePublisher
 
-		handler download.JobHandler
+		handler transfer.JobHandler
 
 		message           []byte
 		originalURL       string
@@ -71,17 +71,21 @@ var _ = Describe("Download Job Handler", func() {
 		})
 
 		By("Instantiating the handler", func() {
-			youtubeDownloader, err := downloader.NewYoutubeDLer(youtubeDLBinPath, workingDir, dummyFileStore, dummyExecutor)
+			youtubeDownloader := download.NewYoutubeDLer(youtubeDLBinPath, dummyExecutor)
+			genericDownloader := download.NewGenericDLer()
+			selectDownloader := download.NewSelectDLer(youtubeDownloader, genericDownloader)
+
+			trackDownloader, err := transfer.NewTrackTransferrer(selectDownloader, dummyTrackStore, dummyFileStore, bucketName, workingDir)
 			Expect(err).NotTo(HaveOccurred())
-			trackDownloader := downloader.NewTrackDownloader(youtubeDownloader, dummyTrackStore, bucketName)
-			handler = download.NewJobHandler(trackDownloader, fakePublisher)
+
+			handler = transfer.NewJobHandler(trackDownloader, fakePublisher)
 		})
 	})
 
 	Describe("Well formed message", func() {
-		var job download.JobParams
+		var job transfer.JobParams
 		BeforeEach(func() {
-			job = download.JobParams{
+			job = transfer.JobParams{
 				TrackListID: tracklistID,
 				TrackID:     trackID,
 			}
@@ -137,7 +141,7 @@ var _ = Describe("Download Job Handler", func() {
 
 	Describe("Poorly formed message", func() {
 		BeforeEach(func() {
-			job := download.JobParams{
+			job := transfer.JobParams{
 				TrackListID: "tracklistID",
 			}
 
