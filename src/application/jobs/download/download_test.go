@@ -46,7 +46,7 @@ var _ = Describe("Download Job Handler", func() {
 
 			tracklistID = "tracklist-id"
 			trackID = "track-id"
-			originalURL = "https://some-third-party/coolsong.mp3"
+			originalURL = "https://youtube.com/coolsong.mp3"
 			originalTrackData = []byte("cool_jamz")
 
 			dummyTrackStore = dummy.NewDummyTrackStore()

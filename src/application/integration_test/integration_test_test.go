@@ -40,7 +40,7 @@ var _ = Describe("IntegrationTest", func() {
 		By("Assigning data to variables", func() {
 			tracklistID = "track-list-ID"
 			trackID = "track-ID"
-			originalURL = "https://third-party/jams.mp3"
+			originalURL = "https://www.youtube.com/jams.mp3"
 			originalTrackData = []byte("cool-jamz")
 			bucketName = "bucket-head"
 		})
