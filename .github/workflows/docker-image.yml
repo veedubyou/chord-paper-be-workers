@@ -53,18 +53,17 @@ jobs:
 
       - name: Deploy Project to K8S Cluster
         uses: steebchen/kubectl@master
-        env:
-          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
         with:
-          args: set image --record deploy/chord-be-workers chord-be-workers=${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
+          config: ${{ secrets.KUBE_CONFIG_DATA }}
+          version: v1.19.3
+          command: set image --record deploy/chord-be-workers chord-be-workers=${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
      
       - name: Verify K8S Deployment
         uses: steebchen/kubectl@master
-        env:
-          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
-#          KUBECTL_VERSION: "1.19"
         with:
-          args: rollout status deploy/chord-be-workers
+          config: ${{ secrets.KUBE_CONFIG_DATA }}
+          version: v1.19.3
+          command: rollout status deploy/chord-be-workers
           
       #- name: Setup GCloud CLI
       #  uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
