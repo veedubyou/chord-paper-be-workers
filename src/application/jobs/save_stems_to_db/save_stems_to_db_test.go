@@ -2,6 +2,7 @@ package save_stems_to_db_test
 
 import (
 	"chord-paper-be-workers/src/application/integration_test/dummy"
+	"chord-paper-be-workers/src/application/jobs/job_message"
 	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
 	"chord-paper-be-workers/src/application/tracks/entity"
 	"context"
@@ -68,9 +69,11 @@ var _ = Describe("JobHandler", func() {
 						"accompaniment": "accompaniment.mp3",
 					}
 					jobParams = save_stems_to_db.JobParams{
-						TrackListID: tracklistID,
-						TrackID:     trackID,
-						StemURLS:    stemURLs,
+						TrackIdentifier: job_message.TrackIdentifier{
+							TrackListID: tracklistID,
+							TrackID:     trackID,
+						},
+						StemURLS: stemURLs,
 					}
 					trackType = entity.SplitTwoStemsType
 
@@ -81,12 +84,12 @@ var _ = Describe("JobHandler", func() {
 
 				Describe("Store saves successfully", func() {
 					It("does not error", func() {
-						err := handler.HandleMessage(messageBytes)
+						err := handler.HandleSaveStemsToDBJob(messageBytes)
 						Expect(err).NotTo(HaveOccurred())
 					})
 
 					It("updates the track store", func() {
-						_ = handler.HandleMessage(messageBytes)
+						_ = handler.HandleSaveStemsToDBJob(messageBytes)
 						track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
 						Expect(err).NotTo(HaveOccurred())
 						stemTrack, ok := track.(entity.StemTrack)
@@ -102,7 +105,7 @@ var _ = Describe("JobHandler", func() {
 					})
 
 					It("also returns a failure", func() {
-						err := handler.HandleMessage(messageBytes)
+						err := handler.HandleSaveStemsToDBJob(messageBytes)
 						Expect(err).To(HaveOccurred())
 					})
 				})
@@ -117,9 +120,11 @@ var _ = Describe("JobHandler", func() {
 						"drums":  "drums.mp3",
 					}
 					jobParams = save_stems_to_db.JobParams{
-						TrackListID: tracklistID,
-						TrackID:     trackID,
-						StemURLS:    stemURLs,
+						TrackIdentifier: job_message.TrackIdentifier{
+							TrackListID: tracklistID,
+							TrackID:     trackID,
+						},
+						StemURLS: stemURLs,
 					}
 					trackType = entity.SplitFourStemsType
 
@@ -130,12 +135,12 @@ var _ = Describe("JobHandler", func() {
 
 				Describe("Store saves successfully", func() {
 					It("does not error", func() {
-						err := handler.HandleMessage(messageBytes)
+						err := handler.HandleSaveStemsToDBJob(messageBytes)
 						Expect(err).NotTo(HaveOccurred())
 					})
 
 					It("updates the track store", func() {
-						_ = handler.HandleMessage(messageBytes)
+						_ = handler.HandleSaveStemsToDBJob(messageBytes)
 						track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
 						Expect(err).NotTo(HaveOccurred())
 						stemTrack, ok := track.(entity.StemTrack)
@@ -151,7 +156,7 @@ var _ = Describe("JobHandler", func() {
 					})
 
 					It("also returns a failure", func() {
-						err := handler.HandleMessage(messageBytes)
+						err := handler.HandleSaveStemsToDBJob(messageBytes)
 						Expect(err).To(HaveOccurred())
 					})
 				})
@@ -167,9 +172,11 @@ var _ = Describe("JobHandler", func() {
 						"piano":  "piano.mp3",
 					}
 					jobParams = save_stems_to_db.JobParams{
-						TrackListID: tracklistID,
-						TrackID:     trackID,
-						StemURLS:    stemURLs,
+						TrackIdentifier: job_message.TrackIdentifier{
+							TrackListID: tracklistID,
+							TrackID:     trackID,
+						},
+						StemURLS: stemURLs,
 					}
 					trackType = entity.SplitFiveStemsType
 
@@ -180,12 +187,12 @@ var _ = Describe("JobHandler", func() {
 
 				Describe("Store saves successfully", func() {
 					It("does not error", func() {
-						err := handler.HandleMessage(messageBytes)
+						err := handler.HandleSaveStemsToDBJob(messageBytes)
 						Expect(err).NotTo(HaveOccurred())
 					})
 
 					It("updates the track store", func() {
-						_ = handler.HandleMessage(messageBytes)
+						_ = handler.HandleSaveStemsToDBJob(messageBytes)
 						track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
 						Expect(err).NotTo(HaveOccurred())
 						stemTrack, ok := track.(entity.StemTrack)
@@ -201,7 +208,7 @@ var _ = Describe("JobHandler", func() {
 					})
 
 					It("also returns a failure", func() {
-						err := handler.HandleMessage(messageBytes)
+						err := handler.HandleSaveStemsToDBJob(messageBytes)
 						Expect(err).To(HaveOccurred())
 					})
 				})
@@ -212,8 +219,10 @@ var _ = Describe("JobHandler", func() {
 		Describe("Malformed job message", func() {
 			BeforeEach(func() {
 				jobParams := save_stems_to_db.JobParams{
-					TrackListID: "tracklist-id",
-					TrackID:     "track-id",
+					TrackIdentifier: job_message.TrackIdentifier{
+						TrackListID: tracklistID,
+						TrackID:     trackID,
+					},
 				}
 
 				var err error
@@ -224,7 +233,7 @@ var _ = Describe("JobHandler", func() {
 			})
 
 			It("returns error", func() {
-				err := handler.HandleMessage(messageBytes)
+				err := handler.HandleSaveStemsToDBJob(messageBytes)
 				Expect(err).To(HaveOccurred())
 			})
 		})

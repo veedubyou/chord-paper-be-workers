@@ -9,7 +9,7 @@ const (
 	Development Environment = "development"
 )
 
-var currentEnvironment Environment = func() Environment {
+func Get() Environment {
 	environment := os.Getenv("ENVIRONMENT")
 	if environment == "" {
 		panic("No environment var is set")
@@ -23,8 +23,4 @@ var currentEnvironment Environment = func() Environment {
 	default:
 		panic("Invalid environment is set")
 	}
-}()
-
-func Get() Environment {
-	return currentEnvironment
 }

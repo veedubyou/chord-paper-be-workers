@@ -3,10 +3,12 @@ package application
 import (
 	filestore "chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/executor"
+	"chord-paper-be-workers/src/application/jobs/job_router"
 	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/application/jobs/split/splitter/file_splitter"
+	"chord-paper-be-workers/src/application/jobs/start"
 	"chord-paper-be-workers/src/application/jobs/transfer"
 	"chord-paper-be-workers/src/application/jobs/transfer/download"
 	"chord-paper-be-workers/src/application/publish"
@@ -62,14 +64,11 @@ func (a *App) Start() error {
 
 func newWorker(consumerConn *amqp.Connection, producerConn *amqp.Connection) worker.QueueWorker {
 	publisher := newPublisher(producerConn)
+	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
 	queueWorker, err := worker.NewQueueWorkerFromConnection(
 		consumerConn,
 		queueName(),
-		[]worker.MessageHandler{
-			newDownloadJobHandler(publisher),
-			newSplitJobHandler(publisher),
-			newSaveToDBJobHandler(),
-		})
+		newJobRouter(trackStore, publisher))
 	ensureOk(err)
 	return queueWorker
 }
@@ -92,7 +91,21 @@ func newGoogleFileStore() filestore.GoogleFileStore {
 	return fileStore
 }
 
-func newDownloadJobHandler(publisher publish.Publisher) transfer.JobHandler {
+func newJobRouter(trackStore trackstore.DynamoDBTrackStore, publisher publish.Publisher) job_router.JobRouter {
+	return job_router.NewJobRouter(
+		trackStore,
+		publisher,
+		newStartJobHandler(trackStore),
+		newDownloadJobHandler(),
+		newSplitJobHandler(),
+		newSaveToDBJobHandler(trackStore))
+}
+
+func newStartJobHandler(trackStore trackstore.DynamoDBTrackStore) start.JobHandler {
+	return start.NewJobHandler(trackStore)
+}
+
+func newDownloadJobHandler() transfer.JobHandler {
 	youtubeDLBinPath := getEnvOrPanic("YOUTUBEDL_BIN_PATH")
 	workingDir := getEnvOrPanic("YOUTUBEDL_WORKING_DIR_PATH")
 	err := os.MkdirAll(workingDir, os.ModePerm)
@@ -108,10 +121,10 @@ func newDownloadJobHandler(publisher publish.Publisher) transfer.JobHandler {
 	trackDownloader, err := transfer.NewTrackTransferrer(selectdler, trackStore, newGoogleFileStore(), bucketName, workingDir)
 	ensureOk(err)
 
-	return transfer.NewJobHandler(trackDownloader, publisher)
+	return transfer.NewJobHandler(trackDownloader)
 }
 
-func newSplitJobHandler(publisher publish.Publisher) split.JobHandler {
+func newSplitJobHandler() split.JobHandler {
 	workingDir := getEnvOrPanic("SPLEETER_WORKING_DIR_PATH")
 	spleeterBinPath := getEnvOrPanic("SPLEETER_BIN_PATH")
 	err := os.MkdirAll(workingDir, os.ModePerm)
@@ -127,10 +140,9 @@ func newSplitJobHandler(publisher publish.Publisher) split.JobHandler {
 	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
 	songSplitUsecase := splitter.NewTrackSplitter(remoteUsecase, trackStore, "chord-paper-tracks")
 
-	return split.NewJobHandler(songSplitUsecase, publisher)
+	return split.NewJobHandler(songSplitUsecase)
 }
 
-func newSaveToDBJobHandler() save_stems_to_db.JobHandler {
-	trackStore := trackstore.NewDynamoDBTrackStore(env.Get())
+func newSaveToDBJobHandler(trackStore trackstore.DynamoDBTrackStore) save_stems_to_db.JobHandler {
 	return save_stems_to_db.NewJobHandler(trackStore)
 }

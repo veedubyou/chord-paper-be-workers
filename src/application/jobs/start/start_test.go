@@ -1,36 +1,26 @@
-package transfer_test
+package start_test
 
 import (
-	"chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/integration_test/dummy"
 	"chord-paper-be-workers/src/application/jobs/job_message"
 	"chord-paper-be-workers/src/application/jobs/transfer"
 	"chord-paper-be-workers/src/application/tracks/entity"
 	"context"
-	"fmt"
-
-	"chord-paper-be-workers/src/application/jobs/transfer/download"
 	"encoding/json"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/onsi/ginkgo"
+	"chord-paper-be-workers/src/application/jobs/start"
 )
 
-var _ = Describe("Download Job Handler", func() {
+var _ = Describe("Start", func() {
 	var (
-		youtubeDLBinPath string
-		bucketName       string
-
 		dummyTrackStore *dummy.TrackStore
-		dummyFileStore  *dummy.FileStore
-		dummyExecutor   *dummy.YoutubeDLExecutor
 
-		handler transfer.JobHandler
+		handler start.JobHandler
 
-		message           []byte
-		originalURL       string
-		originalTrackData []byte
+		message []byte
 
 		tracklistID string
 		trackID     string
@@ -39,17 +29,11 @@ var _ = Describe("Download Job Handler", func() {
 	BeforeEach(func() {
 		By("Initializing all variables", func() {
 			message = nil
-			youtubeDLBinPath = "/bin/youtube-dl"
-			bucketName = "bucket-head"
 
 			tracklistID = "tracklist-id"
 			trackID = "track-id"
-			originalURL = "https://youtube.com/coolsong.mp3"
-			originalTrackData = []byte("cool_jamz")
 
 			dummyTrackStore = dummy.NewDummyTrackStore()
-			dummyFileStore = dummy.NewDummyFileStore()
-			dummyExecutor = dummy.NewDummyYoutubeDLExecutor()
 		})
 
 		By("Setting up the dummy track store data", func() {
@@ -57,31 +41,21 @@ var _ = Describe("Download Job Handler", func() {
 				BaseTrack: entity.BaseTrack{
 					TrackType: entity.SplitFourStemsType,
 				},
-				OriginalURL: originalURL,
+				OriginalURL: "",
+				JobStatus:   entity.RequestedStatus,
 			})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		By("Setting up the dummy executor", func() {
-			dummyExecutor.AddURL(originalURL, originalTrackData)
-		})
-
 		By("Instantiating the handler", func() {
-			youtubeDownloader := download.NewYoutubeDLer(youtubeDLBinPath, dummyExecutor)
-			genericDownloader := download.NewGenericDLer()
-			selectDownloader := download.NewSelectDLer(youtubeDownloader, genericDownloader)
-
-			trackDownloader, err := transfer.NewTrackTransferrer(selectDownloader, dummyTrackStore, dummyFileStore, bucketName, workingDir)
-			Expect(err).NotTo(HaveOccurred())
-
-			handler = transfer.NewJobHandler(trackDownloader)
+			handler = start.NewJobHandler(dummyTrackStore)
 		})
 	})
 
 	Describe("Well formed message", func() {
-		var job transfer.JobParams
+		var job start.JobParams
 		BeforeEach(func() {
-			job = transfer.JobParams{
+			job = start.JobParams{
 				TrackIdentifier: job_message.TrackIdentifier{
 					TrackListID: tracklistID,
 					TrackID:     trackID,
@@ -95,27 +69,27 @@ var _ = Describe("Download Job Handler", func() {
 
 		Describe("Happy path", func() {
 			var err error
-			var expectedSavedURL string
-			var jobParams transfer.JobParams
-			var savedOriginalURL string
+			var jobParams start.JobParams
 
 			BeforeEach(func() {
-				jobParams, savedOriginalURL, err = handler.HandleTransferJob(message)
-				expectedSavedURL = fmt.Sprintf("%s/%s/%s/%s/original/original.mp3", store.GOOGLE_STORAGE_HOST, bucketName, tracklistID, trackID)
+				jobParams, err = handler.HandleStartJob(message)
 			})
 
 			It("doesn't return an error", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("saved the track to the file store", func() {
-				contents, err := dummyFileStore.GetFile(context.Background(), expectedSavedURL)
+			It("updates the track status", func() {
+				track, err := dummyTrackStore.GetTrack(context.Background(), tracklistID, trackID)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(contents).To(Equal(originalTrackData))
+
+				splitStemTrack, ok := track.(entity.SplitStemTrack)
+				Expect(ok).To(BeTrue())
+
+				Expect(splitStemTrack.JobStatus).To(Equal(entity.ProcessingStatus))
 			})
 
 			It("returns the processed data", func() {
-				Expect(savedOriginalURL).To(Equal(expectedSavedURL))
 				Expect(jobParams.TrackListID).To(Equal(job.TrackListID))
 				Expect(jobParams.TrackID).To(Equal(job.TrackID))
 			})
@@ -127,7 +101,7 @@ var _ = Describe("Download Job Handler", func() {
 			})
 
 			It("returns an error", func() {
-				_, _, err := handler.HandleTransferJob(message)
+				_, err := handler.HandleStartJob(message)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -147,7 +121,7 @@ var _ = Describe("Download Job Handler", func() {
 		})
 
 		It("returns error", func() {
-			_, _, err := handler.HandleTransferJob(message)
+			_, err := handler.HandleStartJob(message)
 			Expect(err).To(HaveOccurred())
 		})
 	})

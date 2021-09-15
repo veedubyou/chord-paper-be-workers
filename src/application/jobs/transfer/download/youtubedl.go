@@ -3,6 +3,7 @@ package download
 import (
 	"chord-paper-be-workers/src/application/executor"
 	"chord-paper-be-workers/src/lib/cerr"
+	"fmt"
 
 	"github.com/apex/log"
 )
@@ -28,7 +29,8 @@ func (y YoutubeDLer) Download(sourceURL string, outFilePath string) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return cerr.Field("error_msg", string(output)).
-			Wrap(err).Error("Failed to run youtube-dl")
+			Wrap(err).
+			Error(fmt.Sprintf("Failed to run youtube-dl: %s", string(output)))
 	}
 
 	return nil

@@ -3,11 +3,10 @@ package split_test
 import (
 	"chord-paper-be-workers/src/application/cloud_storage/store"
 	"chord-paper-be-workers/src/application/integration_test/dummy"
-	"chord-paper-be-workers/src/application/jobs/save_stems_to_db"
+	"chord-paper-be-workers/src/application/jobs/job_message"
 	"chord-paper-be-workers/src/application/jobs/split"
 	"chord-paper-be-workers/src/application/jobs/split/splitter"
 	"chord-paper-be-workers/src/application/jobs/split/splitter/file_splitter"
-	"chord-paper-be-workers/src/application/publish/publishfakes"
 	"chord-paper-be-workers/src/application/tracks/entity"
 	"context"
 	"encoding/json"
@@ -25,7 +24,6 @@ var _ = Describe("Split handler", func() {
 		dummyTrackStore *dummy.TrackStore
 		dummyFileStore  *dummy.FileStore
 		dummyExecutor   *dummy.SpleeterExecutor
-		fakePublisher   *publishfakes.FakePublisher
 
 		handler split.JobHandler
 
@@ -55,7 +53,6 @@ var _ = Describe("Split handler", func() {
 			dummyTrackStore = dummy.NewDummyTrackStore()
 			dummyFileStore = dummy.NewDummyFileStore()
 			dummyExecutor = dummy.NewDummySpleeterExecutor()
-			fakePublisher = &publishfakes.FakePublisher{}
 		})
 
 		By("Setting up file on the file store", func() {
@@ -71,7 +68,7 @@ var _ = Describe("Split handler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			trackSplitter := splitter.NewTrackSplitter(remoteSplitter, dummyTrackStore, bucketName)
-			handler = split.NewJobHandler(trackSplitter, fakePublisher)
+			handler = split.NewJobHandler(trackSplitter)
 		})
 	})
 
@@ -96,8 +93,10 @@ var _ = Describe("Split handler", func() {
 	Describe("Well formed message", func() {
 		BeforeEach(func() {
 			job := split.JobParams{
-				TrackListID:      tracklistID,
-				TrackID:          trackID,
+				TrackIdentifier: job_message.TrackIdentifier{
+					TrackListID: tracklistID,
+					TrackID:     trackID,
+				},
 				SavedOriginalURL: savedOriginalURL,
 			}
 
@@ -112,22 +111,12 @@ var _ = Describe("Split handler", func() {
 
 		Describe("Happy path", func() {
 			var (
-				err error
+				err               error
+				returnedJobParams split.JobParams
+				returnedStemUrls  splitter.StemFilePaths
 
-				expectedPublishedStemURLs map[string]string
-				expectedStemFileContent   map[string][]byte
-
-				expectPublishNextJob = func() {
-					msg := fakePublisher.PublishArgsForCall(0)
-					Expect(msg.Type).To(Equal(save_stems_to_db.JobType))
-
-					var saveDBJob save_stems_to_db.JobParams
-					err := json.Unmarshal(msg.Body, &saveDBJob)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(saveDBJob.TrackListID).To(Equal(tracklistID))
-					Expect(saveDBJob.TrackID).To(Equal(trackID))
-					Expect(saveDBJob.StemURLS).To(Equal(expectedPublishedStemURLs))
-				}
+				expectedReturnedStemUrls splitter.StemFilePaths
+				expectedStemFileContent  map[string][]byte
 
 				expectUploadedStemFiles = func() {
 					Expect(expectedStemFileContent).NotTo(BeEmpty())
@@ -137,14 +126,22 @@ var _ = Describe("Split handler", func() {
 						Expect(storedBytes).To(Equal(stemFileContent))
 					}
 				}
+
+				expectReturnValues = func() {
+					Expect(returnedJobParams.TrackListID).To(Equal(tracklistID))
+					Expect(returnedJobParams.TrackID).To(Equal(trackID))
+					Expect(returnedStemUrls).To(Equal(expectedReturnedStemUrls))
+				}
 			)
 
 			BeforeEach(func() {
 				err = nil
+				returnedJobParams = split.JobParams{}
+				returnedStemUrls = nil
 			})
 
 			JustBeforeEach(func() {
-				err = handler.HandleMessage(message)
+				returnedJobParams, returnedStemUrls, err = handler.HandleSplitJob(message)
 			})
 
 			Describe("2stems", func() {
@@ -154,7 +151,7 @@ var _ = Describe("Split handler", func() {
 					vocalsURL := remoteURLBase + "/2stems/vocals.mp3"
 					accompanimentURL := remoteURLBase + "/2stems/accompaniment.mp3"
 
-					expectedPublishedStemURLs = map[string]string{
+					expectedReturnedStemUrls = map[string]string{
 						"vocals":        vocalsURL,
 						"accompaniment": accompanimentURL,
 					}
@@ -169,9 +166,9 @@ var _ = Describe("Split handler", func() {
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				It("publishes the next job", expectPublishNextJob)
-
 				It("uploaded the stem files", expectUploadedStemFiles)
+
+				It("returns the right values", expectReturnValues)
 			})
 
 			Describe("4stems", func() {
@@ -183,7 +180,7 @@ var _ = Describe("Split handler", func() {
 					bassURL := remoteURLBase + "/4stems/bass.mp3"
 					drumsURL := remoteURLBase + "/4stems/drums.mp3"
 
-					expectedPublishedStemURLs = map[string]string{
+					expectedReturnedStemUrls = map[string]string{
 						"vocals": vocalsURL,
 						"other":  otherURL,
 						"bass":   bassURL,
@@ -202,9 +199,9 @@ var _ = Describe("Split handler", func() {
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				It("publishes the next job", expectPublishNextJob)
-
 				It("uploaded the stem files", expectUploadedStemFiles)
+
+				It("returns the right values", expectReturnValues)
 			})
 
 			Describe("5stems", func() {
@@ -217,7 +214,7 @@ var _ = Describe("Split handler", func() {
 					bassURL := remoteURLBase + "/5stems/bass.mp3"
 					drumsURL := remoteURLBase + "/5stems/drums.mp3"
 
-					expectedPublishedStemURLs = map[string]string{
+					expectedReturnedStemUrls = map[string]string{
 						"vocals": vocalsURL,
 						"other":  otherURL,
 						"piano":  pianoURL,
@@ -238,9 +235,9 @@ var _ = Describe("Split handler", func() {
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				It("publishes the next job", expectPublishNextJob)
-
 				It("uploaded the stem files", expectUploadedStemFiles)
+
+				It("returns the right values", expectReturnValues)
 			})
 		})
 
@@ -250,7 +247,7 @@ var _ = Describe("Split handler", func() {
 			})
 
 			It("returns an error", func() {
-				err := handler.HandleMessage(message)
+				_, _, err := handler.HandleSplitJob(message)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -261,7 +258,7 @@ var _ = Describe("Split handler", func() {
 			})
 
 			It("returns an error", func() {
-				err := handler.HandleMessage(message)
+				_, _, err := handler.HandleSplitJob(message)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -270,8 +267,10 @@ var _ = Describe("Split handler", func() {
 	Describe("Malformed message", func() {
 		BeforeEach(func() {
 			job := split.JobParams{
-				TrackListID: tracklistID,
-				TrackID:     trackID,
+				TrackIdentifier: job_message.TrackIdentifier{
+					TrackListID: tracklistID,
+					TrackID:     trackID,
+				},
 			}
 
 			var err error
@@ -282,7 +281,7 @@ var _ = Describe("Split handler", func() {
 		})
 
 		It("failaroo", func() {
-			err := handler.HandleMessage(message)
+			_, _, err := handler.HandleSplitJob(message)
 			Expect(err).To(HaveOccurred())
 		})
 	})

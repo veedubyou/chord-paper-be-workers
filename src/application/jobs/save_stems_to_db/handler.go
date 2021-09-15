@@ -1,14 +1,14 @@
 package save_stems_to_db
 
 import (
+	"chord-paper-be-workers/src/application/jobs/job_message"
 	"chord-paper-be-workers/src/application/tracks/entity"
-	"chord-paper-be-workers/src/application/worker"
 	"chord-paper-be-workers/src/lib/cerr"
 	"context"
 	"encoding/json"
-
-	"github.com/streadway/amqp"
 )
+
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 var postSplitTrackType = map[entity.TrackType]entity.TrackType{
 	entity.SplitTwoStemsType:  entity.TwoStemsType,
@@ -16,32 +16,17 @@ var postSplitTrackType = map[entity.TrackType]entity.TrackType{
 	entity.SplitFiveStemsType: entity.FiveStemsType,
 }
 
-var _ worker.MessageHandler = JobHandler{}
-
-func CreateJobMessage(tracklistID string, trackID string, stemURLs map[string]string) (amqp.Publishing, error) {
-	job := JobParams{
-		TrackListID: tracklistID,
-		TrackID:     trackID,
-		StemURLS:    stemURLs,
-	}
-
-	jsonBytes, err := json.Marshal(job)
-	if err != nil {
-		return amqp.Publishing{}, cerr.Wrap(err).Error("Failed to marshal save DB job params")
-	}
-
-	return amqp.Publishing{
-		Type: JobType,
-		Body: jsonBytes,
-	}, nil
-}
-
 const JobType string = "save_stems_to_db"
+const ErrorMessage string = "Failed to save stem URLs to database"
 
 type JobParams struct {
-	TrackListID string            `json:"tracklist_id"`
-	TrackID     string            `json:"track_id"`
-	StemURLS    map[string]string `json:"stem_urls"`
+	job_message.TrackIdentifier
+	StemURLS map[string]string `json:"stem_urls"`
+}
+
+//counterfeiter:generate . SaveStemsJobHandler
+type SaveStemsJobHandler interface {
+	HandleSaveStemsToDBJob(message []byte) error
 }
 
 func NewJobHandler(trackStore entity.TrackStore) JobHandler {
@@ -54,11 +39,7 @@ type JobHandler struct {
 	trackStore entity.TrackStore
 }
 
-func (JobHandler) JobType() string {
-	return JobType
-}
-
-func (s JobHandler) HandleMessage(message []byte) error {
+func (s JobHandler) HandleSaveStemsToDBJob(message []byte) error {
 	params, err := unmarshalMessage(message)
 	if err != nil {
 		return cerr.Wrap(err).Error("Failed to unmarshal message JSON")

@@ -6,6 +6,7 @@ import (
 	"chord-paper-be-workers/src/lib/cerr"
 	"chord-paper-be-workers/src/lib/working_dir"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,7 +91,8 @@ func (l LocalFileSplitter) runSpleeter(sourcePath string, destPath string, split
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errctx.Field("spleeter_output", string(output)).
-			Wrap(err).Error("Error occurred while running spleeter")
+			Wrap(err).
+			Error(fmt.Sprintf("Error occurred while running spleeter: %s", string(output)))
 	}
 
 	logger.Debug(string(output))

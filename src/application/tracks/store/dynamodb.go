@@ -22,9 +22,13 @@ var (
 )
 
 const (
-	newTrackTypeValueName = ":newTrackType"
-	newStemURLsValueName  = ":newStemURLs"
-	trackIDValueName      = ":trackID"
+	newTrackTypeValueName      = ":newTrackType"
+	newStemURLsValueName       = ":newStemURLs"
+	newStatusValueName         = ":newStatus"
+	newStatusMessageValueName  = ":newStatusMessage"
+	newStatusDebugLogValueName = ":newStatusDebugLog"
+	trackIDValueName           = ":trackID"
+	MaxTrackIndex              = 10
 )
 
 var _ entity.TrackStore = DynamoDBTrackStore{}
@@ -138,24 +142,55 @@ func splitStemTrackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (e
 		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get original URL")
 	}
 
+	statusVal, err := getStringField(track, "job_status")
+	if err != nil {
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get status")
+	}
+
+	status, err := entity.ConvertToStatus(statusVal)
+	if err != nil {
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to convert status")
+	}
+
+	message, err := getStringField(track, "job_status_message")
+	if err != nil {
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get status message")
+	}
+
+	debugLog, err := getStringField(track, "job_status_debug_log")
+	if err != nil {
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get status debug log")
+	}
+
 	return entity.SplitStemTrack{
 		BaseTrack: entity.BaseTrack{
 			TrackType: trackType,
 		},
-		OriginalURL: originalURL,
+		OriginalURL:       originalURL,
+		JobStatus:         status,
+		JobStatusMessage:  message,
+		JobStatusDebugLog: debugLog,
 	}, nil
 }
 
 func (d DynamoDBTrackStore) SetTrack(_ context.Context, trackListID string, trackID string, track entity.Track) error {
-	stemTrack, ok := track.(entity.StemTrack)
-	if !ok {
-		return cerr.Error("Can only write stem tracks at this time")
-	}
+	switch typedTrack := track.(type) {
+	case entity.StemTrack:
+		return d.updateStemTrack(trackListID, trackID, typedTrack)
 
+	case entity.SplitStemTrack:
+		return d.updateSplitStemTrack(trackListID, trackID, typedTrack)
+
+	default:
+		return cerr.Error("Unrecognized track type, cannot write")
+	}
+}
+
+func (d DynamoDBTrackStore) updateSplitStemTrack(trackListID string, trackID string, splitStemTrack entity.SplitStemTrack) error {
 	var err error
-	for i := 0; i < 10; i++ {
-		err = d.updateTrack(i, trackListID, trackID, stemTrack)
-		if err == nil {
+	for i := 0; i < MaxTrackIndex; i++ {
+		// update every track conditionally, because we're not sure which index of the tracklist it is
+		if err = d.updateSplitStemTrackForIndex(i, trackListID, trackID, splitStemTrack); err == nil {
 			return nil
 		}
 	}
@@ -163,9 +198,55 @@ func (d DynamoDBTrackStore) SetTrack(_ context.Context, trackListID string, trac
 	return err
 }
 
-func (d DynamoDBTrackStore) updateTrack(index int, trackListID string, trackID string, stemTrack entity.StemTrack) error {
-	key := makeKey(trackListID)
+func (d DynamoDBTrackStore) updateSplitStemTrackForIndex(index int, trackListID string, trackID string, splitStemTrack entity.SplitStemTrack) error {
+	updateExpression := func() string {
+		statusExpression := fmt.Sprintf("tracks[%d].job_status", index)
+		statusMessageExpression := fmt.Sprintf("tracks[%d].job_status_message", index)
+		statusDebugLogExpression := fmt.Sprintf("tracks[%d].job_status_debug_log", index)
 
+		val := fmt.Sprintf("SET %s = %s, %s = %s, %s = %s", statusExpression, newStatusValueName, statusMessageExpression, newStatusMessageValueName, statusDebugLogExpression, newStatusDebugLogValueName)
+		return val
+	}()
+
+	expressionAttributeValues := func() map[string]*dynamodb.AttributeValue {
+		newStatus := dynamodb.AttributeValue{}
+		newStatus.SetS(string(splitStemTrack.JobStatus))
+
+		newStatusMessage := dynamodb.AttributeValue{}
+		newStatusMessage.SetS(splitStemTrack.JobStatusMessage)
+
+		newStatusDebugLog := dynamodb.AttributeValue{}
+		newStatusDebugLog.SetS(splitStemTrack.JobStatusDebugLog)
+
+		return map[string]*dynamodb.AttributeValue{
+			newStatusValueName:         &newStatus,
+			newStatusMessageValueName:  &newStatusMessage,
+			newStatusDebugLogValueName: &newStatusDebugLog,
+		}
+	}()
+
+	err := d.updateTrack(index, trackListID, trackID, updateExpression, expressionAttributeValues)
+
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to update track")
+	}
+
+	return nil
+}
+
+func (d DynamoDBTrackStore) updateStemTrack(trackListID string, trackID string, stemTrack entity.StemTrack) error {
+	var err error
+	for i := 0; i < MaxTrackIndex; i++ {
+		// update every track conditionally, because we're not sure which index of the tracklist it is
+		if err = d.updateStemTrackForIndex(i, trackListID, trackID, stemTrack); err == nil {
+			return nil
+		}
+	}
+
+	return err
+}
+
+func (d DynamoDBTrackStore) updateStemTrackForIndex(index int, trackListID string, trackID string, stemTrack entity.StemTrack) error {
 	updateExpression := func() string {
 		trackTypeExpression := fmt.Sprintf("tracks[%d].track_type", index)
 		stemURLsExpression := fmt.Sprintf("tracks[%d].stem_urls", index)
@@ -174,12 +255,7 @@ func (d DynamoDBTrackStore) updateTrack(index int, trackListID string, trackID s
 		return val
 	}()
 
-	conditionExpression := fmt.Sprintf("tracks[%d].id = %s", index, trackIDValueName)
-
 	expressionAttributeValues := func() map[string]*dynamodb.AttributeValue {
-		trackIDValue := dynamodb.AttributeValue{}
-		trackIDValue.SetS(trackID)
-
 		newTrackType := dynamodb.AttributeValue{}
 		newTrackType.SetS(string(stemTrack.TrackType))
 
@@ -189,9 +265,32 @@ func (d DynamoDBTrackStore) updateTrack(index int, trackListID string, trackID s
 		return map[string]*dynamodb.AttributeValue{
 			newTrackTypeValueName: &newTrackType,
 			newStemURLsValueName:  &newStemURLs,
-			trackIDValueName:      &trackIDValue,
 		}
 	}()
+
+	err := d.updateTrack(index, trackListID, trackID, updateExpression, expressionAttributeValues)
+
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to update track")
+	}
+
+	return nil
+}
+
+func (d DynamoDBTrackStore) updateTrack(
+	index int,
+	trackListID string,
+	trackID string,
+	updateExpression string,
+	expressionAttributeValues map[string]*dynamodb.AttributeValue,
+) error {
+	key := makeKey(trackListID)
+
+	conditionExpression := fmt.Sprintf("tracks[%d].id = %s", index, trackIDValueName)
+
+	trackIDValue := dynamodb.AttributeValue{}
+	trackIDValue.SetS(trackID)
+	expressionAttributeValues[trackIDValueName] = &trackIDValue
 
 	_, err := d.dynamoDBClient.UpdateItem(&dynamodb.UpdateItemInput{
 		ConditionExpression:       &conditionExpression,
@@ -200,6 +299,7 @@ func (d DynamoDBTrackStore) updateTrack(index int, trackListID string, trackID s
 		TableName:                 &tableName,
 		UpdateExpression:          &updateExpression,
 	})
+
 	if err != nil {
 		return cerr.Wrap(err).Error("Failed to update dynamoDB item")
 	}
