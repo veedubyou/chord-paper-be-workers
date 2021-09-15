@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 var postSplitTrackType = map[entity.TrackType]entity.TrackType{
 	entity.SplitTwoStemsType:  entity.TwoStemsType,
 	entity.SplitFourStemsType: entity.FourStemsType,
@@ -20,6 +22,11 @@ const ErrorMessage string = "Failed to save stem URLs to database"
 type JobParams struct {
 	job_message.TrackIdentifier
 	StemURLS map[string]string `json:"stem_urls"`
+}
+
+//counterfeiter:generate . SaveStemsJobHandler
+type SaveStemsJobHandler interface {
+	HandleSaveStemsToDBJob(message []byte) error
 }
 
 func NewJobHandler(trackStore entity.TrackStore) JobHandler {

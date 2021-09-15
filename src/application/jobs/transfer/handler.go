@@ -6,11 +6,18 @@ import (
 	"encoding/json"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 const JobType string = "transfer_original"
 const ErrorMessage string = "Failed to download source audio for processing"
 
 type JobParams struct {
 	job_message.TrackIdentifier
+}
+
+//counterfeiter:generate . TransferJobHandler
+type TransferJobHandler interface {
+	HandleTransferJob(message []byte) (JobParams, string, error)
 }
 
 func NewJobHandler(downloader TrackTransferrer) JobHandler {

@@ -19,10 +19,10 @@ import (
 func NewJobRouter(
 	trackStore entity.TrackStore,
 	publisher publish.Publisher,
-	startHandler start.JobHandler,
-	transferHandler transfer.JobHandler,
-	splitHandler split.JobHandler,
-	saveStemsHandler save_stems_to_db.JobHandler,
+	startHandler start.StartJobHandler,
+	transferHandler transfer.TransferJobHandler,
+	splitHandler split.SplitJobHandler,
+	saveStemsHandler save_stems_to_db.SaveStemsJobHandler,
 ) JobRouter {
 	return JobRouter{
 		trackStore:       trackStore,
@@ -38,10 +38,10 @@ type JobRouter struct {
 	publisher  publish.Publisher
 	trackStore entity.TrackStore
 
-	startHandler     start.JobHandler
-	transferHandler  transfer.JobHandler
-	splitHandler     split.JobHandler
-	saveStemsHandler save_stems_to_db.JobHandler
+	startHandler     start.StartJobHandler
+	transferHandler  transfer.TransferJobHandler
+	splitHandler     split.SplitJobHandler
+	saveStemsHandler save_stems_to_db.SaveStemsJobHandler
 }
 
 func (j JobRouter) HandleMessage(message amqp.Delivery) error {

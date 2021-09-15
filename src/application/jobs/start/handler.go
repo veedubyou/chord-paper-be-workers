@@ -8,8 +8,15 @@ import (
 	"encoding/json"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 const JobType string = "start_job"
 const ErrorMessage string = "Failed to start processing audio splitting"
+
+//counterfeiter:generate . StartJobHandler
+type StartJobHandler interface {
+	HandleStartJob(message []byte) (JobParams, error)
+}
 
 type JobParams struct {
 	job_message.TrackIdentifier
@@ -42,6 +49,10 @@ func (d JobHandler) HandleStartJob(message []byte) (JobParams, error) {
 	splitStemTrack, ok := track.(entity.SplitStemTrack)
 	if !ok {
 		return JobParams{}, errCtx.Error("Track from DB is not a split stem track")
+	}
+
+	if splitStemTrack.JobStatus != entity.RequestedStatus {
+		return JobParams{}, errCtx.Error("Track is not in requested status, abort processing to be safe")
 	}
 
 	splitStemTrack.JobStatus = entity.ProcessingStatus

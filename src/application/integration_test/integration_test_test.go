@@ -65,6 +65,7 @@ var _ = Describe("IntegrationTest", func() {
 					TrackType: entity.SplitFourStemsType,
 				},
 				OriginalURL: originalURL,
+				JobStatus:   entity.RequestedStatus,
 			}
 			err := trackStore.SetTrack(context.Background(), tracklistID, trackID, track)
 			Expect(err).NotTo(HaveOccurred())

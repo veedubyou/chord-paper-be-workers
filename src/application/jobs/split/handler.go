@@ -11,9 +11,16 @@ import (
 const JobType string = "split_track"
 const ErrorMessage string = "Failed to split the source audio into stems"
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 type JobParams struct {
 	job_message.TrackIdentifier
 	SavedOriginalURL string `json:"saved_original_url"`
+}
+
+//counterfeiter:generate . SplitJobHandler
+type SplitJobHandler interface {
+	HandleSplitJob(message []byte) (JobParams, splitter.StemFilePaths, error)
 }
 
 func NewJobHandler(splitter splitter.TrackSplitter) JobHandler {
