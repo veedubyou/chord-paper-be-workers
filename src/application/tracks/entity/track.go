@@ -35,6 +35,28 @@ func ConvertToTrackType(val string) (TrackType, error) {
 	}
 }
 
+type SplitTrackStatus string
+
+const (
+	InvalidStatus    SplitTrackStatus = ""
+	RequestedStatus  SplitTrackStatus = "requested"
+	ProcessingStatus SplitTrackStatus = "processing"
+	ErrorStatus      SplitTrackStatus = "error"
+)
+
+func ConvertToStatus(val string) (SplitTrackStatus, error) {
+	switch SplitTrackStatus(val) {
+	case RequestedStatus:
+		return RequestedStatus, nil
+	case ProcessingStatus:
+		return ProcessingStatus, nil
+	case ErrorStatus:
+		return ErrorStatus, nil
+	default:
+		return InvalidStatus, cerr.Field("track_status", val).Error("Value does not match any statuses")
+	}
+}
+
 type Track interface {
 	GetTrackType() TrackType
 }
@@ -58,5 +80,8 @@ var _ Track = SplitStemTrack{}
 
 type SplitStemTrack struct {
 	BaseTrack
-	OriginalURL string
+	OriginalURL       string
+	JobStatus         SplitTrackStatus
+	JobStatusMessage  string
+	JobStatusDebugLog string
 }

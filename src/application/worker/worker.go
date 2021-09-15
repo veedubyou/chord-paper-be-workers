@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"chord-paper-be-workers/src/application/jobs/job_router"
 	"chord-paper-be-workers/src/lib/cerr"
 
 	"github.com/apex/log"
@@ -14,20 +15,20 @@ type MessageChannel interface {
 }
 
 type QueueWorker struct {
-	channel         MessageChannel
-	messageHandlers []MessageHandler
-	queueName       string
+	channel   MessageChannel
+	jobRouter job_router.JobRouter
+	queueName string
 }
 
-func NewQueueWorker(channel MessageChannel, queueName string, messageHandlers []MessageHandler) QueueWorker {
+func NewQueueWorker(channel MessageChannel, queueName string, jobRouter job_router.JobRouter) QueueWorker {
 	return QueueWorker{
-		channel:         channel,
-		queueName:       queueName,
-		messageHandlers: messageHandlers,
+		channel:   channel,
+		queueName: queueName,
+		jobRouter: jobRouter,
 	}
 }
 
-func NewQueueWorkerFromConnection(conn *amqp.Connection, queueName string, messageHandlers []MessageHandler) (QueueWorker, error) {
+func NewQueueWorkerFromConnection(conn *amqp.Connection, queueName string, jobRouter job_router.JobRouter) (QueueWorker, error) {
 	rabbitChannel, err := conn.Channel()
 	if err != nil {
 		_ = conn.Close()
@@ -48,7 +49,7 @@ func NewQueueWorkerFromConnection(conn *amqp.Connection, queueName string, messa
 		return QueueWorker{}, cerr.Wrap(err).Error("Failed to declare queue")
 	}
 
-	return NewQueueWorker(rabbitChannel, queue.Name, messageHandlers), nil
+	return NewQueueWorker(rabbitChannel, queue.Name, jobRouter), nil
 }
 
 func (q *QueueWorker) Start() error {
@@ -74,7 +75,7 @@ func (q *QueueWorker) Start() error {
 	for message := range messageStream {
 		logger := log.WithField("message_type", message.Type)
 		logger.Info("Handling message")
-		err := q.handleMessage(message)
+		err := q.jobRouter.HandleMessage(message)
 		if err != nil {
 			err = cerr.Field("message_type", message.Type).
 				Wrap(err).Error("Failed to process message")
@@ -93,14 +94,4 @@ func (q *QueueWorker) Start() error {
 	}
 
 	return nil
-}
-
-func (q *QueueWorker) handleMessage(message amqp.Delivery) error {
-	for _, handler := range q.messageHandlers {
-		if message.Type == handler.JobType() {
-			return handler.HandleMessage(message.Body)
-		}
-	}
-
-	return cerr.Error("No appropriate message handler found")
 }

@@ -19,6 +19,9 @@ var _ = BeforeSuite(func() {
 	workingDir = "./unit_test_wd"
 	err := os.MkdirAll(workingDir, os.ModePerm)
 	Expect(err).NotTo(HaveOccurred())
+
+	err = os.Setenv("ENVIRONMENT", "test")
+	Expect(err).NotTo(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {
