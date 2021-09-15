@@ -56,6 +56,9 @@ func (j JobRouter) HandleMessage(message amqp.Delivery) error {
 
 func (j JobRouter) handleMessageWithoutErrorHandling(message amqp.Delivery) error {
 	var nextJobMsg amqp.Publishing
+	var nextJobMessage string
+	var nextJobProgress int
+	wasLastJob := false
 
 	switch message.Type {
 	case start.JobType:
@@ -64,6 +67,8 @@ func (j JobRouter) handleMessageWithoutErrorHandling(message amqp.Delivery) erro
 			return cerr.Field("message_body", string(message.Body)).Wrap(err).Error("Failed to handle start job")
 		}
 
+		nextJobMessage = "Retrieving the original track from provided URL"
+		nextJobProgress = 10
 		nextJobMsg, err = createTransferJobMessage(startJobParams.TrackListID, startJobParams.TrackID)
 		if err != nil {
 			return cerr.Field("tracklist_id", startJobParams.TrackListID).
@@ -78,6 +83,8 @@ func (j JobRouter) handleMessageWithoutErrorHandling(message amqp.Delivery) erro
 			return cerr.Field("message_body", string(message.Body)).Wrap(err).Error("Failed to handle transfer job")
 		}
 
+		nextJobMessage = "Splitting the track into stems"
+		nextJobProgress = 30
 		nextJobMsg, err = createSplitJobMessage(transferJobParams.TrackListID, transferJobParams.TrackID, savedOriginalURL)
 		if err != nil {
 			return cerr.Field("tracklist_id", transferJobParams.TrackListID).
@@ -93,6 +100,8 @@ func (j JobRouter) handleMessageWithoutErrorHandling(message amqp.Delivery) erro
 			return cerr.Field("message_body", string(message.Body)).Wrap(err).Error("Failed to handle split job")
 		}
 
+		nextJobMessage = "Saving processed stems into database"
+		nextJobProgress = 90
 		nextJobMsg, err = createSaveStemsToDBJobMessage(splitJobParams.TrackListID, splitJobParams.TrackID, stemURLs)
 		if err != nil {
 			return cerr.Field("tracklist_id", splitJobParams.TrackListID).
@@ -108,19 +117,48 @@ func (j JobRouter) handleMessageWithoutErrorHandling(message amqp.Delivery) erro
 			return cerr.Field("message_body", string(message.Body)).Wrap(err).Error("Failed to handle save stems to DB job")
 		}
 
-		// last step, no more jobs to publish
-		nextJobMsg = amqp.Publishing{}
+		wasLastJob = true
 
 	default:
 		return cerr.Field("job_type", message.Type).Error("Unrecognized amqp job type")
 	}
 
-	hasNextJobToPublish := nextJobMsg.Type != ""
-	if hasNextJobToPublish {
+	if !wasLastJob {
+		if err := j.updateProgress(message, nextJobMessage, nextJobProgress); err != nil {
+			return cerr.Wrap(err).Error("Failed to publish next job message")
+		}
+
 		if err := j.publisher.Publish(nextJobMsg); err != nil {
 			return cerr.Field("next_job", nextJobMsg).
 				Wrap(err).Error("Failed to publish next job message")
 		}
+	}
+
+	return nil
+}
+
+func (j JobRouter) updateProgress(message amqp.Delivery, statusMessage string, progress int) error {
+	var trackParams job_message.TrackIdentifier
+	err := json.Unmarshal(message.Body, &trackParams)
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to unmarshal job message")
+	}
+
+	updater := func(track entity.Track) (entity.Track, error) {
+		splitStemTrack, ok := track.(entity.SplitStemTrack)
+		if !ok {
+			return entity.BaseTrack{}, cerr.Error("Track from DB is not a split stem track")
+		}
+
+		splitStemTrack.JobStatusMessage = statusMessage
+		splitStemTrack.JobProgress = progress
+
+		return splitStemTrack, nil
+	}
+
+	err = j.trackStore.UpdateTrack(context.Background(), trackParams.TrackListID, trackParams.TrackID, updater)
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to update track")
 	}
 
 	return nil
@@ -148,23 +186,22 @@ func (j JobRouter) handleError(message amqp.Delivery, jobError error) error {
 		return cerr.Wrap(err).Error("Failed to report error to track DB")
 	}
 
-	track, err := j.trackStore.GetTrack(context.Background(), trackParams.TrackListID, trackParams.TrackID)
-	if err != nil {
-		return cerr.Wrap(err).Error("Failed to get track from DB")
+	updater := func(track entity.Track) (entity.Track, error) {
+		splitStemTrack, ok := track.(entity.SplitStemTrack)
+		if !ok {
+			return entity.BaseTrack{}, cerr.Error("Track from DB is not a split stem track")
+		}
+
+		splitStemTrack.JobStatus = entity.ErrorStatus
+		splitStemTrack.JobStatusMessage = j.getErrorMessage(message.Type)
+		splitStemTrack.JobStatusDebugLog = jobError.Error()
+
+		return splitStemTrack, nil
 	}
 
-	splitStemTrack, ok := track.(entity.SplitStemTrack)
-	if !ok {
-		return cerr.Error("Track from DB is not a split stem track")
-	}
-
-	splitStemTrack.JobStatus = entity.ErrorStatus
-	splitStemTrack.JobStatusMessage = j.getErrorMessage(message.Type)
-	splitStemTrack.JobStatusDebugLog = jobError.Error()
-
-	err = j.trackStore.SetTrack(context.Background(), trackParams.TrackListID, trackParams.TrackID, splitStemTrack)
+	err = j.trackStore.UpdateTrack(context.Background(), trackParams.TrackListID, trackParams.TrackID, updater)
 	if err != nil {
-		return cerr.Wrap(err).Error("Failed to set the track error status")
+		return cerr.Wrap(err).Error("Failed to update track")
 	}
 
 	return nil

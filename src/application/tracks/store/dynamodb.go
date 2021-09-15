@@ -6,6 +6,7 @@ import (
 	"chord-paper-be-workers/src/lib/env"
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 
@@ -22,11 +23,17 @@ var (
 )
 
 const (
+	jobStatusAttr         = "job_status"
+	jobStatusMessageAttr  = "job_status_message"
+	jobStatusDebugLogAttr = "job_status_debug_log"
+	jobProgressAttr       = "job_progress"
+
 	newTrackTypeValueName      = ":newTrackType"
 	newStemURLsValueName       = ":newStemURLs"
 	newStatusValueName         = ":newStatus"
 	newStatusMessageValueName  = ":newStatusMessage"
 	newStatusDebugLogValueName = ":newStatusDebugLog"
+	newStatusProgressValueName = ":newStatusProgress"
 	trackIDValueName           = ":trackID"
 	MaxTrackIndex              = 10
 )
@@ -142,7 +149,7 @@ func splitStemTrackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (e
 		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get original URL")
 	}
 
-	statusVal, err := getStringField(track, "job_status")
+	statusVal, err := getStringField(track, jobStatusAttr)
 	if err != nil {
 		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get status")
 	}
@@ -152,14 +159,19 @@ func splitStemTrackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (e
 		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to convert status")
 	}
 
-	message, err := getStringField(track, "job_status_message")
+	message, err := getStringField(track, jobStatusMessageAttr)
 	if err != nil {
 		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get status message")
 	}
 
-	debugLog, err := getStringField(track, "job_status_debug_log")
+	debugLog, err := getStringField(track, jobStatusDebugLogAttr)
 	if err != nil {
 		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get status debug log")
+	}
+
+	progress, err := getIntField(track, jobProgressAttr)
+	if err != nil {
+		return entity.SplitStemTrack{}, cerr.Wrap(err).Error("Failed to get progress")
 	}
 
 	return entity.SplitStemTrack{
@@ -170,6 +182,7 @@ func splitStemTrackFromDynamoTrack(track map[string]*dynamodb.AttributeValue) (e
 		JobStatus:         status,
 		JobStatusMessage:  message,
 		JobStatusDebugLog: debugLog,
+		JobProgress:       progress,
 	}, nil
 }
 
@@ -186,6 +199,25 @@ func (d DynamoDBTrackStore) SetTrack(_ context.Context, trackListID string, trac
 	}
 }
 
+func (d DynamoDBTrackStore) UpdateTrack(ctx context.Context, trackListID string, trackID string, updater entity.TrackUpdater) error {
+	track, err := d.GetTrack(ctx, trackListID, trackID)
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to get track from DB")
+	}
+
+	updatedTrack, err := updater(track)
+	if err != nil {
+		return cerr.Wrap(err).Error("Track update function failed")
+	}
+
+	err = d.SetTrack(ctx, trackListID, trackID, updatedTrack)
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to set the updated track")
+	}
+
+	return nil
+}
+
 func (d DynamoDBTrackStore) updateSplitStemTrack(trackListID string, trackID string, splitStemTrack entity.SplitStemTrack) error {
 	var err error
 	for i := 0; i < MaxTrackIndex; i++ {
@@ -200,11 +232,17 @@ func (d DynamoDBTrackStore) updateSplitStemTrack(trackListID string, trackID str
 
 func (d DynamoDBTrackStore) updateSplitStemTrackForIndex(index int, trackListID string, trackID string, splitStemTrack entity.SplitStemTrack) error {
 	updateExpression := func() string {
-		statusExpression := fmt.Sprintf("tracks[%d].job_status", index)
-		statusMessageExpression := fmt.Sprintf("tracks[%d].job_status_message", index)
-		statusDebugLogExpression := fmt.Sprintf("tracks[%d].job_status_debug_log", index)
+		statusExpression := fmt.Sprintf("tracks[%d].%s", index, jobStatusAttr)
+		statusMessageExpression := fmt.Sprintf("tracks[%d].%s", index, jobStatusMessageAttr)
+		statusDebugLogExpression := fmt.Sprintf("tracks[%d].%s", index, jobStatusDebugLogAttr)
+		statusProgressExpression := fmt.Sprintf("tracks[%d].%s", index, jobProgressAttr)
 
-		val := fmt.Sprintf("SET %s = %s, %s = %s, %s = %s", statusExpression, newStatusValueName, statusMessageExpression, newStatusMessageValueName, statusDebugLogExpression, newStatusDebugLogValueName)
+		val := fmt.Sprintf(
+			"SET %s = %s, %s = %s, %s = %s, %s = %s",
+			statusExpression, newStatusValueName,
+			statusMessageExpression, newStatusMessageValueName,
+			statusDebugLogExpression, newStatusDebugLogValueName,
+			statusProgressExpression, newStatusProgressValueName)
 		return val
 	}()
 
@@ -218,10 +256,14 @@ func (d DynamoDBTrackStore) updateSplitStemTrackForIndex(index int, trackListID 
 		newStatusDebugLog := dynamodb.AttributeValue{}
 		newStatusDebugLog.SetS(splitStemTrack.JobStatusDebugLog)
 
+		newStatusProgress := dynamodb.AttributeValue{}
+		newStatusProgress.SetN(strconv.Itoa(splitStemTrack.JobProgress))
+
 		return map[string]*dynamodb.AttributeValue{
 			newStatusValueName:         &newStatus,
 			newStatusMessageValueName:  &newStatusMessage,
 			newStatusDebugLogValueName: &newStatusDebugLog,
+			newStatusProgressValueName: &newStatusProgress,
 		}
 	}()
 
@@ -251,8 +293,14 @@ func (d DynamoDBTrackStore) updateStemTrackForIndex(index int, trackListID strin
 		trackTypeExpression := fmt.Sprintf("tracks[%d].track_type", index)
 		stemURLsExpression := fmt.Sprintf("tracks[%d].stem_urls", index)
 
-		val := fmt.Sprintf("SET %s = %s, %s = %s", trackTypeExpression, newTrackTypeValueName, stemURLsExpression, newStemURLsValueName)
-		return val
+		setNewValuesExpression := fmt.Sprintf("SET %s = %s, %s = %s",
+			trackTypeExpression, newTrackTypeValueName,
+			stemURLsExpression, newStemURLsValueName,
+		)
+
+		removeJobStatusExpression := makeRemoveJobStatusExpression(index)
+
+		return fmt.Sprintf("%s %s", setNewValuesExpression, removeJobStatusExpression)
 	}()
 
 	expressionAttributeValues := func() map[string]*dynamodb.AttributeValue {
@@ -325,4 +373,14 @@ func makeKey(key string) map[string]*dynamodb.AttributeValue {
 	return map[string]*dynamodb.AttributeValue{
 		idField: &attributeValue,
 	}
+}
+
+func makeRemoveJobStatusExpression(trackIndex int) string {
+	trackElementPrefix := fmt.Sprintf("tracks[%d]", trackIndex)
+	jobStatusExpression := fmt.Sprintf("%s.%s", trackElementPrefix, jobStatusAttr)
+	jobStatusMessageExpression := fmt.Sprintf("%s.%s", trackElementPrefix, jobStatusMessageAttr)
+	jobStatusDebugLogExpression := fmt.Sprintf("%s.%s", trackElementPrefix, jobStatusDebugLogAttr)
+	jobProgressExpression := fmt.Sprintf("%s.%s", trackElementPrefix, jobProgressAttr)
+
+	return fmt.Sprintf("REMOVE %s, %s, %s, %s", jobStatusExpression, jobStatusMessageExpression, jobStatusDebugLogExpression, jobProgressExpression)
 }

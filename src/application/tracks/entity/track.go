@@ -84,4 +84,5 @@ type SplitStemTrack struct {
 	JobStatus         SplitTrackStatus
 	JobStatusMessage  string
 	JobStatusDebugLog string
+	JobProgress       int
 }

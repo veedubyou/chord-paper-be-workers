@@ -43,6 +43,7 @@ var _ = Describe("JobRouter", func() {
 		message     amqp.Delivery
 		messageJson []byte
 
+		// reusable tests
 		WhenJobFails = func(failureSetup func()) {
 			Describe("When job fails", func() {
 				BeforeEach(failureSetup)
@@ -69,6 +70,20 @@ var _ = Describe("JobRouter", func() {
 				It("doesn't publish any new jobs", func() {
 					Expect(rabbitMQ.MessageChannel).To(BeEmpty())
 				})
+			})
+		}
+
+		ItUpdatesProgress = func() {
+			It("updates the progress", func() {
+				_ = jobRouter.HandleMessage(message)
+
+				track, err := trackStore.GetTrack(context.Background(), tracklistID, trackID)
+				Expect(err).NotTo(HaveOccurred())
+
+				stemTrack, ok := track.(entity.SplitStemTrack)
+				Expect(ok).To(BeTrue())
+
+				Expect(stemTrack.JobProgress).To(BeNumerically(">", 0))
 			})
 		}
 	)
@@ -102,8 +117,11 @@ var _ = Describe("JobRouter", func() {
 				BaseTrack: entity.BaseTrack{
 					TrackType: entity.SplitFourStemsType,
 				},
-				OriginalURL: "",
-				JobStatus:   entity.RequestedStatus,
+				OriginalURL:       "",
+				JobStatus:         entity.RequestedStatus,
+				JobStatusMessage:  "",
+				JobStatusDebugLog: "",
+				JobProgress:       0,
 			}
 			err := trackStore.SetTrack(context.Background(), tracklistID, trackID, track)
 			Expect(err).NotTo(HaveOccurred())
@@ -146,6 +164,8 @@ var _ = Describe("JobRouter", func() {
 				Expect(transferJob.TrackListID).To(Equal(tracklistID))
 				Expect(transferJob.TrackID).To(Equal(trackID))
 			})
+
+			ItUpdatesProgress()
 		})
 
 		WhenJobFails(func() {
@@ -193,6 +213,8 @@ var _ = Describe("JobRouter", func() {
 				Expect(splitJob.TrackID).To(Equal(trackID))
 				Expect(splitJob.SavedOriginalURL).To(Equal(savedOriginalURL))
 			})
+
+			ItUpdatesProgress()
 		})
 
 		WhenJobFails(func() {
@@ -247,6 +269,8 @@ var _ = Describe("JobRouter", func() {
 				Expect(saveStemsJob.TrackID).To(Equal(trackID))
 				Expect(saveStemsJob.StemURLS).To(Equal(stemURLs))
 			})
+
+			ItUpdatesProgress()
 		})
 
 		WhenJobFails(func() {
@@ -275,6 +299,19 @@ var _ = Describe("JobRouter", func() {
 			It("doesn't publishes the next job", func() {
 				_ = jobRouter.HandleMessage(message)
 				Expect(rabbitMQ.MessageChannel).To(BeEmpty())
+			})
+
+			It("doesn't update progress", func() {
+				track, err := trackStore.GetTrack(context.Background(), tracklistID, trackID)
+				Expect(err).NotTo(HaveOccurred())
+
+				// technically in the real run this would not be a split stem track anymore
+				// because this job would have updated it to a loaded stem track
+				// however, this was mocked out and we still want to assert this behaviour
+				stemTrack, ok := track.(entity.SplitStemTrack)
+				Expect(ok).To(BeTrue())
+
+				Expect(stemTrack.JobProgress).To(BeZero())
 			})
 		})
 
