@@ -2,6 +2,7 @@ package dummy
 
 import (
 	"chord-paper-be-workers/src/application/tracks/entity"
+	"chord-paper-be-workers/src/lib/cerr"
 	"context"
 	"sync"
 )
@@ -55,6 +56,29 @@ func (t *TrackStore) SetTrack(_ context.Context, tracklistID string, trackID str
 	}
 
 	t.State[tracklistID][trackID] = track
+
+	return nil
+}
+
+func (t *TrackStore) UpdateTrack(ctx context.Context, trackListID string, trackID string, updater entity.TrackUpdater) error {
+	if t.Unavailable {
+		return NetworkFailure
+	}
+
+	track, err := t.GetTrack(ctx, trackListID, trackID)
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to get track from DB")
+	}
+
+	updatedTrack, err := updater(track)
+	if err != nil {
+		return cerr.Wrap(err).Error("Track update function failed")
+	}
+
+	err = t.SetTrack(ctx, trackListID, trackID, updatedTrack)
+	if err != nil {
+		return cerr.Wrap(err).Error("Failed to set the updated track")
+	}
 
 	return nil
 }

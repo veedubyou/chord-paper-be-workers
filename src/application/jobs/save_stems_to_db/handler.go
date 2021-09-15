@@ -47,33 +47,31 @@ func (s JobHandler) HandleSaveStemsToDBJob(message []byte) error {
 
 	errctx := cerr.Field("job_params", params)
 
-	track, err := s.trackStore.GetTrack(context.Background(), params.TrackListID, params.TrackID)
+	updater := func(track entity.Track) (entity.Track, error) {
+		splitStemTrack, ok := track.(entity.SplitStemTrack)
+		if !ok {
+			return entity.BaseTrack{}, errctx.Error("Unexpected - track is not a split request")
+		}
+
+		newTrackType, ok := postSplitTrackType[splitStemTrack.TrackType]
+		if !ok {
+			return entity.BaseTrack{}, errctx.Field("track", splitStemTrack).
+				Error("No matching entry for setting the new track type")
+		}
+
+		newTrack := entity.StemTrack{
+			BaseTrack: entity.BaseTrack{
+				TrackType: newTrackType,
+			},
+			StemURLs: params.StemURLS,
+		}
+
+		return newTrack, nil
+	}
+
+	err = s.trackStore.UpdateTrack(context.Background(), params.TrackListID, params.TrackID, updater)
 	if err != nil {
-		return errctx.Wrap(err).Error("Failed to get track")
-	}
-
-	splitStemTrack, ok := track.(entity.SplitStemTrack)
-	if !ok {
-		return errctx.Error("Unexpected - track is not a split request")
-	}
-
-	newTrackType, ok := postSplitTrackType[splitStemTrack.TrackType]
-	if !ok {
-		return errctx.Field("track", splitStemTrack).
-			Error("No matching entry for setting the new track type")
-	}
-
-	newTrack := entity.StemTrack{
-		BaseTrack: entity.BaseTrack{
-			TrackType: newTrackType,
-		},
-		StemURLs: params.StemURLS,
-	}
-
-	err = s.trackStore.SetTrack(context.Background(), params.TrackListID, params.TrackID, newTrack)
-	if err != nil {
-		return errctx.Field("new_track", newTrack).
-			Wrap(err).Error("Failed to write new track")
+		return errctx.Wrap(err).Error("Failed to update track")
 	}
 
 	return nil

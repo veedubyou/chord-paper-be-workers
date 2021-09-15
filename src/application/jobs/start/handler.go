@@ -41,24 +41,22 @@ func (d JobHandler) HandleStartJob(message []byte) (JobParams, error) {
 	errCtx := cerr.Field("tracklist_id", params.TrackListID).
 		Field("track_id", params.TrackID)
 
-	track, err := d.trackStore.GetTrack(context.Background(), params.TrackListID, params.TrackID)
-	if err != nil {
-		return JobParams{}, errCtx.Wrap(err).Error("Failed to get track from DB")
+	updater := func(track entity.Track) (entity.Track, error) {
+		splitStemTrack, ok := track.(entity.SplitStemTrack)
+		if !ok {
+			return entity.BaseTrack{}, errCtx.Error("Track from DB is not a split stem track")
+		}
+
+		if splitStemTrack.JobStatus != entity.RequestedStatus {
+			return entity.BaseTrack{}, errCtx.Error("Track is not in requested status, abort processing to be safe")
+		}
+
+		splitStemTrack.JobStatus = entity.ProcessingStatus
+
+		return splitStemTrack, nil
 	}
 
-	splitStemTrack, ok := track.(entity.SplitStemTrack)
-	if !ok {
-		return JobParams{}, errCtx.Error("Track from DB is not a split stem track")
-	}
-
-	if splitStemTrack.JobStatus != entity.RequestedStatus {
-		return JobParams{}, errCtx.Error("Track is not in requested status, abort processing to be safe")
-	}
-
-	splitStemTrack.JobStatus = entity.ProcessingStatus
-	splitStemTrack.JobStatusMessage = "Audio processing has started"
-
-	err = d.trackStore.SetTrack(context.Background(), params.TrackListID, params.TrackID, splitStemTrack)
+	err = d.trackStore.UpdateTrack(context.Background(), params.TrackListID, params.TrackID, updater)
 	if err != nil {
 		return JobParams{}, errCtx.Wrap(err).Error("Failed to set the track status")
 	}
