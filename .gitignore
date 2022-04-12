@@ -13,4 +13,4 @@
 cloudkey.json
 .idea/
 wd/
-.envrc
+local.envrc
