@@ -32,8 +32,6 @@ jobs:
 
       - name: Build image w/version
         run: docker build . --file Dockerfile --tag ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
-      - name: Build image latest
-        run: docker build . --file Dockerfile --tag ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:latest
       - name: Push image w/version
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
 
