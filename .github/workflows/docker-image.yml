@@ -36,19 +36,13 @@ jobs:
         run: docker build . --file Dockerfile --tag ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:latest
       - name: Push image w/version
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:${{ env.gitver }}
-      - name: Push image latest
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/chord-be-workers:latest
 
       # youtube-dl
 
       - name: Build youtube-dl image w/version
         run: docker build --no-cache ./youtube-dl --tag ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:${{ env.gitver }}
-      - name: Build youtube-dl image latest
-        run: docker build --no-cache ./youtube-dl --tag ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:latest
       - name: Push youtube-dl image w/version
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:${{ env.gitver }}
-      - name: Push youtube-dl image latest
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/youtube-dl-bin:latest
 
       - name: Deploy Project to K8S Cluster
         uses: steebchen/kubectl@master
@@ -63,6 +57,9 @@ jobs:
           config: ${{ secrets.KUBE_CONFIG_DATA }}
           version: v1.19.3
           command: rollout status deploy/chord-be-workers
+
+      - name: Cleanup Images
+        run: docker image prune -af
           
       #- name: Setup GCloud CLI
       #  uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
