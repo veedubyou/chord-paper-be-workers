@@ -42,10 +42,10 @@ type App struct {
 }
 
 func NewApp() App {
-	rabbitURL := getEnvOrPanic("RABBITMQ_URL")
-	consumerConn, err := amqp.Dial(rabbitURL)
+	rabbitMQURL := rabbitURL()
+	consumerConn, err := amqp.Dial(rabbitMQURL)
 	ensureOk(err)
-	producerConn, err := amqp.Dial(rabbitURL)
+	producerConn, err := amqp.Dial(rabbitMQURL)
 	ensureOk(err)
 
 	return App{
@@ -73,8 +73,29 @@ func newWorker(consumerConn *amqp.Connection, producerConn *amqp.Connection) wor
 	return queueWorker
 }
 
+func rabbitURL() string {
+	switch env.Get() {
+	case env.Production:
+		return getEnvOrPanic("RABBITMQ_URL")
+	case env.Development:
+		return "amqp://localhost:5672"
+
+	default:
+		panic("Unrecognized environment")
+	}
+}
+
 func queueName() string {
-	return getEnvOrPanic("RABBITMQ_QUEUE_NAME")
+	switch env.Get() {
+	case env.Production:
+		return getEnvOrPanic("RABBITMQ_QUEUE_NAME")
+	case env.Development:
+		return "chord-paper-tracks-dev"
+
+	default:
+		panic("Unrecognized environment")
+	}
+
 }
 
 func newPublisher(conn *amqp.Connection) publish.RabbitMQPublisher {

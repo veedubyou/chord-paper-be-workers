@@ -43,10 +43,18 @@ var _ entity.TrackStore = DynamoDBTrackStore{}
 func NewDynamoDBTrackStore(environment env.Environment) DynamoDBTrackStore {
 	dbSession := session.Must(session.NewSession())
 
-	config := aws.NewConfig().WithRegion("us-east-2").WithCredentials(credentials.NewEnvCredentials())
+	config := aws.NewConfig().WithCredentials(credentials.NewEnvCredentials())
 
-	if environment == env.Development {
-		config = config.WithEndpoint("http://localhost:8000")
+	switch environment {
+	case env.Production:
+		config = config.WithRegion("us-east-2")
+
+	case env.Development:
+		config = config.WithEndpoint("http://localhost:8000").
+			WithRegion("localhost")
+
+	default:
+		panic("Unrecognized environment")
 	}
 
 	client := dynamodb.New(dbSession, config)
