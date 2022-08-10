@@ -258,8 +258,6 @@ github.com/tj/go-buffer v1.1.0/go.mod h1:iyiJpfFcR2B9sXu7KvjbT9fpM4mOelRSDTbntVj
 github.com/tj/go-elastic v0.0.0-20171221160941-36157cbbebc2/go.mod h1:WjeM0Oo1eNAjXGDx2yma7uG2XoyRZTq1uv3M/o7imD0=
 github.com/tj/go-kinesis v0.0.0-20171128231115-08b17f58cb1b/go.mod h1:/yhzCV0xPfx6jb1bBgRFjl5lytqVqZXEaeqWP8lTEao=
 github.com/tj/go-spin v1.1.0/go.mod h1:Mg1mzmePZm4dva8Qz60H2lHwmJ2loum4VIrLgVnKwh4=
-github.com/veedubyou/direnv-to-dotenv v0.0.0-20220410203939-aba42bf0d19b h1:jClzvp9IxIs9m0CucJ4P6SoNk3cKeKF13sy25eeB3b4=
-github.com/veedubyou/direnv-to-dotenv v0.0.0-20220410203939-aba42bf0d19b/go.mod h1:BkVQS52cDgaDsrv6qrpxeuwIhWSI1ietChoHtZqGjQ8=
 github.com/veedubyou/direnv-to-dotenv v0.0.0-20220411180210-10e036c2954d h1:8ar8CO8iPLtY3DR/MdmFH5xNdemqIV49f+p8oZ/wac0=
 github.com/veedubyou/direnv-to-dotenv v0.0.0-20220411180210-10e036c2954d/go.mod h1:BkVQS52cDgaDsrv6qrpxeuwIhWSI1ietChoHtZqGjQ8=
 github.com/veedubyou/xerr v0.0.0-20220215085538-688ac680bfc6 h1:oV9ZnkJ5p1YfjhcLeQfyGSmG58KtjsKpevulYbNRiQA=
